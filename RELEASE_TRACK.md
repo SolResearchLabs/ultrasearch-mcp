@@ -1,6 +1,6 @@
 # UltraSearch MCP Release Track
 
-This file is the persistent release checkpoint for agents and maintainers. Keep it current when making release-facing changes.
+This file is the persistent release checkpoint for agents and maintainers. Read it first when resuming this repo.
 
 ## Repo truth
 
@@ -11,9 +11,9 @@ This file is the persistent release checkpoint for agents and maintainers. Keep 
 - Imported source snapshot: `SolResearchLabs/searxng-mcp@ea2306c1d1897666b2fbb7b8a7f1b226333ccdb4`
 - Private deployment repo remains separate: `SolResearchLabs/UltraSearch`
 
-## Release scope
+## Product boundary
 
-UltraSearch MCP is a production-grade web research MCP server. The public repo contains the reusable MCP product, not the CBHR deployment control plane.
+UltraSearch MCP is a production-grade web research MCP server. This public repo contains the reusable MCP product, not the CBHR deployment control plane.
 
 In scope:
 
@@ -35,27 +35,6 @@ Out of scope:
 - Internal deploy request workflows
 - Private API keys or secret values
 
-## Validation status
-
-Last local Windows validation:
-
-- `pnpm install --frozen-lockfile`: PASS
-- `pnpm exec tsc --noEmit`: PASS
-- `pnpm lint`: PASS
-- `pnpm test`: PASS, 61 files, 651 tests, no type errors
-- `pnpm build`: PASS
-- `ultrasearch-mcp doctor`: PASS with redacted secrets
-- dash hygiene scan for em dash, en dash, and minus sign: PASS
-
-Pending before first public release tag:
-
-- Docker build validation
-- Local MCP protocol smoke from this repo
-- Optional live TinyFish smoke through this repo
-- GitHub Actions CI readback after initial push
-- npm publish dry run
-- final v0.1.0 release notes
-
 ## Configuration contract
 
 Canonical variables:
@@ -74,32 +53,24 @@ Canonical variables:
 - `ULTRASEARCH_BRAVE_API_KEY`
 - `ULTRASEARCH_TINYFISH_LOCATION`
 
-Legacy aliases are accepted where useful, but new docs should prefer `ULTRASEARCH_*`.
+Legacy aliases are accepted where useful. New docs should prefer `ULTRASEARCH_*`.
 
-## Safety rules
+## Validation completed
 
-- Never commit secrets.
-- Never print full API keys in tests, docs, CI, or doctor output.
-- HTTP transport has no built-in auth. Bind locally or protect at the network layer.
-- Hosted fallback should be opt-in and budgeted.
-- Keep private deployment workflows out of this repo.
-## Next agent start here
+Local Windows validation:
 
-1. Read this file.
-2. Run `git status --short`.
-3. Run `pnpm lint && pnpm test && pnpm build`.
-4. Run Docker build validation.
-5. Run MCP protocol smoke.
-6. Commit and push only after validation is green.
-7. After push, read back public CI status before planning the npm release.
+- `pnpm install --frozen-lockfile`: PASS
+- `pnpm exec tsc --noEmit`: PASS
+- `pnpm lint`: PASS
+- `pnpm test`: PASS, 61 files, 651 tests, no type errors
+- `pnpm build`: PASS
+- `ultrasearch-mcp doctor`: PASS with redacted secrets
+- `ultrasearch-mcp init-config`: PASS
+- dash hygiene scan for em dash, en dash, and minus sign: PASS
+- old private lineage grep outside notice and this track file: PASS
+- secret-shaped grep excluding lock/domain metadata: PASS
 
-## Last known working tree
-
-The repo was created public and empty first, then populated locally from a curated snapshot. The initial public commit is pending until Docker and MCP smoke are green.
-
-## 2026-09-08 checkpoint
-
-Additional validation completed after the initial track file was created:
+Docker and MCP validation:
 
 - Docker build: PASS
 - Docker image tag: `ultrasearch-mcp:release-smoke`
@@ -110,32 +81,34 @@ Additional validation completed after the initial track file was created:
 - MCP tools list over HTTP: PASS, 7 tools
 - Tools returned: `clear_cache`, `crawl_site`, `domain_stats`, `fetch_url`, `search`, `search_and_fetch`, `search_and_summarize`
 
-Remaining before release planning:
+Public CI milestones:
 
-- Initial public commit and push
-- Public GitHub Actions CI readback
-- Optional live TinyFish smoke in this new repo once a repo or org secret is available
-- npm publish dry run
+- Initial code commit: `941bc9a74c4a33fb85f43cb85c0067ecd609cd62`
+- Initial code CI run: `34274303003`, completed success
+- Track checkpoint commit: `ccf7654d44dc1021979e9ee3f8eb31001c7c9fac`
+- Track checkpoint CI run: `34274503535`, completed success
 
-## 2026-09-08 public push checkpoint
-
-Initial public commit:
-
-- Commit: `941bc9a74c4a33fb85f43cb85c0067ecd609cd62`
-- Message: `Initial UltraSearch MCP release import`
-- Files: 164
-- Insertions: 24762
-- Push target: `SolResearchLabs/ultrasearch-mcp main`
-
-Public CI readback for initial commit:
-
-- Workflow: `CI`
-- Run: `34274303003`
-- Status: completed
-- Conclusion: success
-- Head SHA: `941bc9a74c4a33fb85f43cb85c0067ecd609cd62`
-
-Current next step after this checkpoint commit:
+## Remaining before release planning
 
 - Add live TinyFish smoke for this public repo after placing a repo or org secret named `ULTRASEARCH_TINYFISH_API_KEY` or `TINYFISH_API_KEY`.
-- Run `npm pack --dry-run` and inspect package contents before the first npm release.
+- Run `npm pack --dry-run` and inspect package contents before first npm release.
+- Decide whether to publish Docker image now or after npm package smoke.
+- Draft final `v0.1.0` release notes.
+
+## Safety rules
+
+- Never commit secrets.
+- Never print full API keys in tests, docs, CI, or doctor output.
+- HTTP transport has no built-in auth. Bind locally or protect at the network layer.
+- Hosted fallback should be opt-in and budgeted.
+- Keep private deployment workflows out of this repo.
+
+## Next agent start here
+
+1. Read this file.
+2. Run `git status --short`.
+3. Run `pnpm lint && pnpm test && pnpm build` if code changed.
+4. Run Docker build validation if Docker or package scripts changed.
+5. Run MCP protocol smoke if transport or package entrypoint changed.
+6. Commit and push only after validation is green.
+7. After push, read back public CI status before planning the npm release.
