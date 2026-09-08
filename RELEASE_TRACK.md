@@ -90,7 +90,7 @@ Public CI milestones:
 
 ## Remaining before release planning
 
-- Add live TinyFish smoke for this public repo after placing a repo or org secret named `ULTRASEARCH_TINYFISH_API_KEY` or `TINYFISH_API_KEY`.
+- Run live TinyFish smoke locally with a maintainer-provided environment variable or config file. Package users supply their own keys at runtime through local env or config.
 - Run `npm pack --dry-run` and inspect package contents before first npm release.
 - Decide whether to publish Docker image now or after npm package smoke.
 - Draft final `v0.1.0` release notes.
