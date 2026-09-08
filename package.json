@@ -1,0 +1,93 @@
+{
+  "name": "@solresearchlabs/ultrasearch-mcp",
+  "version": "0.1.0",
+  "description": "Production-grade web research MCP server with SearXNG, hosted fallback providers, fetch and crawl tools, and budget guardrails.",
+  "main": "build/src/index.js",
+  "bin": {
+    "ultrasearch-mcp": "build/src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SolResearchLabs/ultrasearch-mcp.git"
+  },
+  "homepage": "https://github.com/SolResearchLabs/ultrasearch-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/SolResearchLabs/ultrasearch-mcp/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node scripts/chmod-build.mjs",
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck",
+    "coverage": "vitest run --coverage",
+    "lint": "biome check src/ tests/",
+    "lint:fix": "biome check --write src/ tests/",
+    "doctor": "node build/src/index.js doctor",
+    "init-config": "node build/src/index.js init-config",
+    "dump-domain": "node build/src/cli/dump-domain.js",
+    "domain-db-maintenance": "node build/src/cli/domain-db-maintenance.js",
+    "restore-domain-db": "node build/src/cli/restore-domain-db.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "search",
+    "web-research",
+    "searxng",
+    "tinyfish",
+    "exa",
+    "parallel",
+    "brave",
+    "crawl"
+  ],
+  "author": "Sol Research Labs",
+  "license": "MIT",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "build/src/",
+    "docs/",
+    "examples/",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mozilla/readability": "^0.6.0",
+    "@nats-io/nats-core": "^3.4.0",
+    "@nats-io/transport-node": "^3.4.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.220.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
+    "@opentelemetry/sdk-metrics": "^2.9.0",
+    "@opentelemetry/sdk-node": "^0.220.0",
+    "fast-xml-parser": "^5.10.0",
+    "iovalkey": "^0.3.3",
+    "jsdom": "^29.1.1",
+    "robots-parser": "^3.0.1",
+    "undici": "^7.28.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": ">=8.4.0",
+      "hono": ">=4.12.21",
+      "@hono/node-server": ">=1.19.13",
+      "fast-uri": ">=3.1.2",
+      "ip-address": ">=10.1.1",
+      "qs": ">=6.15.2"
+    }
+  }
+}

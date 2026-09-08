@@ -1,0 +1,48 @@
+{
+  "boost": [
+    "servethehome.com",
+    "arstechnica.com",
+    "level1techs.com",
+    "github.com",
+    "stackoverflow.com",
+    "superuser.com",
+    "unix.stackexchange.com"
+  ],
+  "block": [
+    "pinterest.com",
+    "quora.com"
+  ],
+  "llms_txt": [
+    "docs.anthropic.com",
+    "docs.openai.com",
+    "docs.stripe.com",
+    "docs.crawl4ai.com",
+    "docs.firecrawl.dev",
+    "docs.cursor.com"
+  ],
+  "tier_skip": {},
+  "adblock_skip": [],
+  "profiles": {
+    "homelab": {
+      "boost": [
+        "reddit.com/r/homelab",
+        "reddit.com/r/selfhosted",
+        "forums.servethehome.com",
+        "linuxserver.io",
+        "docs.docker.com",
+        "wiki.archlinux.org"
+      ],
+      "block": []
+    },
+    "dev": {
+      "boost": [
+        "stackoverflow.com",
+        "github.com",
+        "dev.to",
+        "docs.npmjs.com",
+        "developer.mozilla.org"
+      ],
+      "block": []
+    }
+  }
+}

@@ -1,0 +1,46 @@
+export { cloudflareSnapshot } from "./cloudflare.js";
+export { applyTier2Readability, crawl4aiFetch } from "./crawl4ai.js";
+// Keep the legacy adapter exported while crawl_site still uses Firecrawl in
+// this phase. It is no longer part of the page-fetch cascade.
+export { firecrawlScrape } from "./firecrawl.js";
+export { githubFetch, isGithubUrl } from "./github.js";
+export { fetchRawHtmlForMetadata, rawFetch } from "./raw.js";
+export type { Tier } from "./types.js";
+export { waybackFetch } from "./wayback.js";
+
+import { cloudflareSnapshot } from "./cloudflare.js";
+import { applyTier2Readability, crawl4aiFetch } from "./crawl4ai.js";
+import { rawFetch } from "./raw.js";
+import type { Tier } from "./types.js";
+
+/** Tier 1 - Cloudflare Browser Run (remote browser-rendered snapshot). */
+export const tier1: Tier = {
+  name: "tier1_cloudflare",
+  slot: "tier1",
+  async fetch(url, maxChars, _preferFit, tuning) {
+    const r = await cloudflareSnapshot(url, maxChars, tuning);
+    return r?.text ? r : null;
+  },
+};
+
+/** Tier 2 - Crawl4AI (browser automation + Readability post-processing). */
+export const tier2: Tier = {
+  name: "tier2_crawl4ai",
+  slot: "tier2",
+  async fetch(url, maxChars, preferFit = false, tuning) {
+    const r = await crawl4aiFetch(url, maxChars, preferFit, tuning);
+    return r ? applyTier2Readability(r, url) : null;
+  },
+};
+
+/** Tier 3 - Raw Node.js fetch + JSDOM Readability. */
+export const tier3: Tier = {
+  name: "tier3_rawfetch",
+  slot: "tier3",
+  async fetch(url, maxChars, _preferFit, tuning) {
+    return rawFetch(url, maxChars, tuning);
+  },
+};
+
+/** Canonical ordered tier list. Order determines cascade priority. */
+export const ALL_TIERS: readonly Tier[] = [tier1, tier2, tier3];

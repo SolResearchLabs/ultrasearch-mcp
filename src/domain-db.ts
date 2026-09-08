@@ -1,0 +1,354 @@
+// Per-domain capability database. Backed by Valkey under the `domain:*`
+// namespace (no overlap with existing `fetch:`, `search:`, `robots:`, `llms:`
+// or `embed:` prefixes). Each record captures what we've learned about a
+// domain across fetches: tier success rates, presence of llms.txt /
+// robots.txt, post-extraction sampling, etc.
+//
+// Writes are best-effort and fire-and-forget: a failure here must never
+// surface to the caller of fetchPage.
+
+import { cacheAtomicUpdate, cacheGet } from "./cache.js";
+
+export const DOMAIN_RECORD_TTL_SECONDS = 90 * 24 * 60 * 60;
+export const SCHEMA_VERSION = 4;
+const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export type TierName =
+  | "tier1_cloudflare"
+  // Compatibility alias for schema-4 history/tests from the upstream
+  // Firecrawl implementation. Production routing no longer emits this name.
+  | "tier1_firecrawl"
+  | "tier2_crawl4ai"
+  | "tier3_rawfetch"
+  | "tier4_wayback"
+  // GitHub fast path (raw.githubusercontent.com / api.github.com / github.com
+  // README fetches). Not a cascade tier - dispatched directly in fetchPage -
+  // but routed through runTier() so its hit/miss/error is recorded like any
+  // other tier.
+  | "github";
+export type PreferredStrategy = "llms_full_txt" | "tier1" | "tier2" | "tier3";
+
+export interface TierStat {
+  attempts: number;
+  ok: number;
+  fail: number;
+  last_fail_reason?: string;
+  window_start_ms: number;
+}
+
+export interface DomainCapabilities {
+  llms_txt?: {
+    present: boolean;
+    url?: string;
+    last_checked: string;
+  };
+  llms_full_txt?: {
+    present: boolean;
+    size_bytes?: number;
+    last_checked: string;
+  };
+  robots_txt?: {
+    present: boolean;
+    fetched: string;
+    allows_us: boolean;
+  };
+  json_ld_article?: {
+    sampled: number;
+    present: number;
+    last_sampled_at: string;
+  };
+  og_title?: {
+    sampled: number;
+    present: number;
+    last_sampled_at: string;
+  };
+  // Side-channel raw-HTML fetch used for JSON-LD/og:title sampling
+  // (fetchRawHtmlForMetadata). Distinct from tier_stats_30d - this fetch
+  // exists to sample metadata, not to deliver full page content, so a
+  // "failure" here doesn't mean the domain is unreachable. Tracked so
+  // dump-domain can answer "is this domain reachable at all" without
+  // cross-referencing tier stats and post-extract sampling separately.
+  metadata_fetch?: {
+    attempts: number;
+    ok: number;
+    fail: number;
+    last_checked: string;
+  };
+  // Lightweight signal that a domain showed up in search results, even if
+  // it was never fetched. Lets dump-domain distinguish "never seen" from
+  // "seen in search, never fetched."
+  seen_in_search?: {
+    count: number;
+    last_seen_at: string;
+  };
+}
+
+export interface DomainRecord {
+  schema_version: number;
+  domain: string;
+  first_seen: string;
+  last_fetch: string;
+  capabilities: DomainCapabilities;
+  tier_stats_30d: {
+    tier1: TierStat;
+    tier2: TierStat;
+    tier3: TierStat;
+    tier4: TierStat;
+    github: TierStat;
+  };
+  // Tier slots are stable across provider swaps, so provider identity is
+  // tracked separately rather than forcing a whole domain-db schema bump.
+  // Records without this field predate the Cloudflare Tier-1 migration and
+  // their tier1 stats must not influence Cloudflare routing.
+  tier1_provider?: "cloudflare";
+  preferred_strategy?: PreferredStrategy;
+  notes?: string;
+}
+
+function emptyStat(): TierStat {
+  return { attempts: 0, ok: 0, fail: 0, window_start_ms: Date.now() };
+}
+
+function newRecord(domain: string, now: string): DomainRecord {
+  return {
+    schema_version: SCHEMA_VERSION,
+    domain,
+    first_seen: now,
+    last_fetch: now,
+    capabilities: {},
+    tier_stats_30d: {
+      tier1: emptyStat(),
+      tier2: emptyStat(),
+      tier3: emptyStat(),
+      tier4: emptyStat(),
+      github: emptyStat(),
+    },
+    tier1_provider: "cloudflare",
+  };
+}
+
+export function normalizeHostname(input: string): string | null {
+  try {
+    // If `input` is a URL, pull the hostname; otherwise treat it as a hostname.
+    const host = input.includes("://") ? new URL(input).hostname : input.trim();
+    return host.replace(/^www\./i, "").toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+export function domainKey(hostname: string): string {
+  return `domain:${hostname}`;
+}
+
+/**
+ * Parse a raw domain-db value, returning the record only if it is valid JSON
+ * on the current schema. Stale-schema and malformed records return null - the
+ * same staleness gate `getDomainRecord` applies, extracted so the bounded
+ * enumeration in domain-stats.ts uses an identical contract.
+ */
+export function parseDomainRecord(raw: string | null): DomainRecord | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DomainRecord;
+    if (parsed.schema_version !== SCHEMA_VERSION) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export async function getDomainRecord(
+  hostnameOrUrl: string,
+): Promise<DomainRecord | null> {
+  const hostname = normalizeHostname(hostnameOrUrl);
+  if (!hostname) return null;
+  return parseDomainRecord(await cacheGet(domainKey(hostname)));
+}
+
+// Atomic read-modify-write: uses WATCH/MULTI/EXEC via cacheAtomicUpdate.
+// Replaces the former in-process per-hostname Promise queue, which only
+// serialized within a single process. WATCH/MULTI/EXEC handles concurrent
+// writers across multiple processes as well.
+function updateRecord(
+  hostnameOrUrl: string,
+  mutate: (r: DomainRecord) => void,
+): Promise<void> {
+  const hostname = normalizeHostname(hostnameOrUrl);
+  if (!hostname) return Promise.resolve();
+  const key = domainKey(hostname);
+  const now = new Date().toISOString();
+  return cacheAtomicUpdate(key, DOMAIN_RECORD_TTL_SECONDS, (raw) => {
+    let record: DomainRecord;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as DomainRecord;
+        record =
+          parsed.schema_version === SCHEMA_VERSION
+            ? parsed
+            : newRecord(hostname, now);
+      } catch {
+        record = newRecord(hostname, now);
+      }
+    } else {
+      record = newRecord(hostname, now);
+    }
+    mutate(record);
+    record.last_fetch = now;
+    return JSON.stringify(record);
+  });
+}
+
+const TIER_KEY: Record<
+  TierName,
+  "tier1" | "tier2" | "tier3" | "tier4" | "github"
+> = {
+  tier1_cloudflare: "tier1",
+  tier1_firecrawl: "tier1",
+  tier2_crawl4ai: "tier2",
+  tier3_rawfetch: "tier3",
+  tier4_wayback: "tier4",
+  github: "github",
+};
+
+export async function recordTierAttempt(
+  url: string,
+  tier: TierName,
+  outcome: "hit" | "miss" | "error",
+  failReason?: string,
+): Promise<void> {
+  const slot = TIER_KEY[tier];
+  await updateRecord(url, (record) => {
+    // Schema 4 used the stable `tier1` slot for Firecrawl. The first
+    // Cloudflare attempt explicitly starts a fresh Tier-1 learning window,
+    // while leaving every other domain capability/stat untouched.
+    if (tier === "tier1_cloudflare" && record.tier1_provider !== "cloudflare") {
+      record.tier_stats_30d.tier1 = emptyStat();
+      record.tier1_provider = "cloudflare";
+    }
+
+    const stat = record.tier_stats_30d[slot];
+    if (Date.now() - stat.window_start_ms > WINDOW_MS) {
+      stat.attempts = 0;
+      stat.ok = 0;
+      stat.fail = 0;
+      stat.window_start_ms = Date.now();
+      delete stat.last_fail_reason;
+    }
+    stat.attempts += 1;
+    if (outcome === "hit") {
+      stat.ok += 1;
+    } else {
+      stat.fail += 1;
+      if (failReason) stat.last_fail_reason = failReason;
+    }
+  });
+}
+
+export async function recordLlmsFullProbe(
+  url: string,
+  present: boolean,
+  sizeBytes?: number,
+): Promise<void> {
+  await updateRecord(url, (record) => {
+    record.capabilities.llms_full_txt = {
+      present,
+      last_checked: new Date().toISOString(),
+      ...(sizeBytes !== undefined ? { size_bytes: sizeBytes } : {}),
+    };
+    if (present) record.preferred_strategy = "llms_full_txt";
+  });
+}
+
+export async function recordRobotsProbe(
+  url: string,
+  present: boolean,
+  allowsUs: boolean,
+): Promise<void> {
+  await updateRecord(url, (record) => {
+    record.capabilities.robots_txt = {
+      present,
+      fetched: new Date().toISOString(),
+      allows_us: allowsUs,
+    };
+  });
+}
+
+export async function recordPostExtractSample(
+  url: string,
+  signals: { jsonLdPresent: boolean; ogTitlePresent: boolean },
+): Promise<void> {
+  await updateRecord(url, (record) => {
+    const now = new Date().toISOString();
+    const jl = record.capabilities.json_ld_article ?? {
+      sampled: 0,
+      present: 0,
+      last_sampled_at: now,
+    };
+    jl.sampled += 1;
+    if (signals.jsonLdPresent) jl.present += 1;
+    jl.last_sampled_at = now;
+    record.capabilities.json_ld_article = jl;
+
+    const og = record.capabilities.og_title ?? {
+      sampled: 0,
+      present: 0,
+      last_sampled_at: now,
+    };
+    og.sampled += 1;
+    if (signals.ogTitlePresent) og.present += 1;
+    og.last_sampled_at = now;
+    record.capabilities.og_title = og;
+  });
+}
+
+export async function recordMetadataFetchAttempt(
+  url: string,
+  ok: boolean,
+): Promise<void> {
+  await updateRecord(url, (record) => {
+    const stat = record.capabilities.metadata_fetch ?? {
+      attempts: 0,
+      ok: 0,
+      fail: 0,
+      last_checked: new Date().toISOString(),
+    };
+    stat.attempts += 1;
+    if (ok) stat.ok += 1;
+    else stat.fail += 1;
+    stat.last_checked = new Date().toISOString();
+    record.capabilities.metadata_fetch = stat;
+  });
+}
+
+/**
+ * Record that a domain appeared in search results. Cheap, best-effort - no
+ * fetch is performed, this just marks the domain as "seen" so dump-domain
+ * can distinguish it from a domain that's never shown up at all.
+ */
+export async function recordSearchAppearance(url: string): Promise<void> {
+  await updateRecord(url, (record) => {
+    const now = new Date().toISOString();
+    const seen = record.capabilities.seen_in_search ?? {
+      count: 0,
+      last_seen_at: now,
+    };
+    seen.count += 1;
+    seen.last_seen_at = now;
+    record.capabilities.seen_in_search = seen;
+  });
+}
+
+/**
+ * Whether JSON-LD post-extraction should be skipped for this domain. Returns
+ * true once we've sampled at least 5 pages and found no JSON-LD Article
+ * schema in any of them.
+ */
+export async function shouldSkipJsonLdPostExtract(
+  url: string,
+): Promise<boolean> {
+  const record = await getDomainRecord(url);
+  const stat = record?.capabilities.json_ld_article;
+  if (!stat) return false;
+  return stat.sampled >= 5 && stat.present === 0;
+}

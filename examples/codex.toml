@@ -1,0 +1,9 @@
+[mcp_servers.ultrasearch]
+command = "npx"
+args = ["-y", "@solresearchlabs/ultrasearch-mcp"]
+
+[mcp_servers.ultrasearch.env]
+ULTRASEARCH_SEARXNG_URL = "http://localhost:8081"
+ULTRASEARCH_HOSTED_FALLBACK_ENABLED = "true"
+ULTRASEARCH_PROVIDER_ORDER = "tinyfish,exa,parallel,brave"
+ULTRASEARCH_TINYFISH_API_KEY = "${ULTRASEARCH_TINYFISH_API_KEY}"
