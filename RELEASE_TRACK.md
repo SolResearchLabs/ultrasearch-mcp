@@ -239,3 +239,38 @@ Next release lane:
 3. Run manual `Release` workflow dispatch with `create_draft_release=false` and `push_ghcr=false`.
 4. If the dry-run workflow is green, test the `.mcpb` artifact in Claude Desktop.
 5. Only after manual MCPB install passes, cut `v0.1.0` tag.
+
+## 2026-09-08 public release workflow dry run
+
+Public checkpoint commit:
+
+- Commit: `e276b1904affc44da621217c5d7d1c84ec5d6fb6`.
+- Normal CI run: `34291054157`, completed success.
+- Manual Release workflow run: `34291192554`, completed success.
+- Release job: `Build release artifacts`, completed success.
+
+Release dry-run behavior confirmed:
+
+- Installed dependencies.
+- Validated release metadata.
+- Ran test and build.
+- Prepared npm release assets.
+- Built MCPB artifact.
+- Built Docker image.
+- Generated checksums.
+- Uploaded workflow artifact `ultrasearch-mcp-0.1.0-release-assets`.
+- GHCR push skipped because `push_ghcr=false`.
+- Draft GitHub Release skipped because `create_draft_release=false`.
+
+Artifact readback:
+
+- Artifact ID: `10081434499`.
+- Artifact digest: `sha256:5f9feac1718c2eb94766810b3e3c79bb1bf7e90ef80a0add1a3f067a8711b913`.
+- Artifact expires: `2026-10-08T23:35:17Z`.
+Next release gate:
+
+1. Download the release artifact from run `34291192554`.
+2. Test `ultrasearch-mcp-0.1.0.mcpb` in Claude Desktop.
+3. If MCPB install passes, cut tag `v0.1.0`.
+4. Let tag workflow create the draft GitHub Release.
+5. Publish npm and MCP Registry only after final human approval.
