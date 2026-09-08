@@ -183,3 +183,15 @@ Remaining before public v0.1.0 tag:
 - Optional live TinyFish smoke using maintainer local env/config only.
 - Publish npm package, then publish MCP Registry metadata.
 - Decide whether to publish GHCR image in v0.1.0 or v0.2.0.
+
+## 2026-09-08 hygiene cleanup checkpoint
+
+Removed an internal temporary helper script from `scripts/` so the public repo keeps only product and maintainer-facing release scripts.
+
+Next release lane:
+
+1. Confirm MCPB manifest shape against the latest Claude Desktop behavior on a real install.
+2. Add GitHub release workflow to attach `.mcpb`, checksums, and npm pack dry-run output.
+3. Add optional Docker image publish workflow to GHCR.
+4. Add MCP Registry publish checklist using `server.json` after npm package publish.
+5. Run final tag gate before `v0.1.0`.

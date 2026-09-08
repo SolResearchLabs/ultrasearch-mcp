@@ -1,8 +1,0 @@
-﻿from pathlib import Path
-p = Path(r"C:\Users\Aryan\AppData\Local\Temp\ultrasearch-release-53432d67c77548748612c5e110e007a5\ultrasearch-mcp\tests\search-provider-registry.test.ts")
-s = p.read_text()
-s = s.replace('  it("tries providers sequentially and stops on the first hit", async () => {\n    providers.exa.search.mockResolvedValueOnce([]);', '  it("tries providers sequentially and stops on the first hit", async () => {\n    process.env.HOSTED_SEARCH_PROVIDER_ORDER = "exa,parallel,tinyfish,brave";\n    providers.exa.search.mockResolvedValueOnce([]);')
-s = s.replace('  it("continues after a provider error instead of failing the whole fallback", async () => {\n    providers.exa.search.mockRejectedValueOnce(new Error("exa unavailable"));', '  it("continues after a provider error instead of failing the whole fallback", async () => {\n    process.env.HOSTED_SEARCH_PROVIDER_ORDER = "exa,parallel,tinyfish,brave";\n    providers.exa.search.mockRejectedValueOnce(new Error("exa unavailable"));')
-s = s.replace('  it("skips unconfigured providers without attempting them", async () => {\n    providers.exa.configured.mockReturnValue(false);', '  it("skips unconfigured providers without attempting them", async () => {\n    process.env.HOSTED_SEARCH_PROVIDER_ORDER = "exa,parallel,tinyfish,brave";\n    providers.exa.configured.mockReturnValue(false);')
-s = s.replace('    expect(configuredHostedSearchProviders()).toEqual([\n      "exa",\n      "tinyfish",\n      "brave",\n    ]);', '    expect(configuredHostedSearchProviders()).toEqual([\n      "tinyfish",\n      "exa",\n      "brave",\n    ]);')
-p.write_text(s)
