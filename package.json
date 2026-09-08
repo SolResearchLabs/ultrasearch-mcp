@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/SolResearchLabs/ultrasearch-mcp.git"
+    "url": "git+https://github.com/SolResearchLabs/ultrasearch-mcp.git"
   },
   "homepage": "https://github.com/SolResearchLabs/ultrasearch-mcp#readme",
   "bugs": {
@@ -29,7 +29,8 @@
     "restore-domain-db": "node build/src/cli/restore-domain-db.js",
     "pack:dry": "npm pack --dry-run",
     "mcpb:stage": "pnpm build && node scripts/build-mcpb.mjs",
-    "mcpb:pack": "pnpm build && node scripts/build-mcpb.mjs && npx -y @anthropic-ai/mcpb pack dist/mcpb"
+    "mcpb:pack": "pnpm build && node scripts/build-mcpb.mjs && npx -y @anthropic-ai/mcpb pack dist/mcpb",
+    "release:validate": "node scripts/validate-release-metadata.mjs"
   },
   "keywords": [
     "mcp",

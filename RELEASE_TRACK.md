@@ -195,3 +195,47 @@ Next release lane:
 3. Add optional Docker image publish workflow to GHCR.
 4. Add MCP Registry publish checklist using `server.json` after npm package publish.
 5. Run final tag gate before `v0.1.0`.
+
+## 2026-09-08 release workflow checkpoint
+
+Implemented:
+
+- `.github/workflows/release.yml` for tag and manual release dry runs.
+- `scripts/validate-release-metadata.mjs` to enforce package, `server.json`, MCPB manifest, npm entry, tag version, and secret metadata alignment.
+- `docs/release-notes/v0.1.0.md` for the first draft release body.
+- `release-assets*/` ignored in `.gitignore`.
+
+Workflow behavior:
+
+- On `v*` tag push, build release assets and create a draft GitHub Release.
+- On manual dispatch, run the same release artifact path without creating a draft by default.
+- GHCR push is manual-only through `push_ghcr=true`.
+- No npm publish and no MCP Registry publish happen in this workflow.
+Local validation:
+
+- YAML lint: PASS.
+- Release metadata validator: PASS for `v0.1.0`.
+- Dash hygiene scan: PASS.
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm exec tsc --noEmit`: PASS.
+- `pnpm lint`: PASS.
+- `pnpm test`: PASS, 61 files, 651 tests, no type errors.
+- `pnpm build`: PASS.
+- `npm publish --dry-run --access public`: PASS.
+- `npm pack --pack-destination release-assets-local`: PASS.
+- MCPB validate, pack, clean, and info: PASS.
+- Docker build tag `ultrasearch-mcp:release-workflow-local`: PASS.
+- Docker MCP label JSON readback: `io.github.solresearchlabs/ultrasearch-mcp`.
+Local artifact hashes:
+
+- npm tarball: `9b26949ccf7de3abc5a1efd64a180be0e7962c96a25ba2d9771ed2dac776245a`.
+- MCPB bundle: `e1ef7beb6f44f6048f6717fdc0721234bba37682740c766d4580ddbadfd371b1`.
+- Docker image ID file: `f7df294241899fd9e0e9a44a5d97e1c9a3c0c55d95b55eef2ebb386c3a2456d8`.
+
+Next release lane:
+
+1. Commit and push the release workflow checkpoint.
+2. Confirm normal public CI.
+3. Run manual `Release` workflow dispatch with `create_draft_release=false` and `push_ghcr=false`.
+4. If the dry-run workflow is green, test the `.mcpb` artifact in Claude Desktop.
+5. Only after manual MCPB install passes, cut `v0.1.0` tag.

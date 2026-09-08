@@ -8,3 +8,4 @@ domain-db-snapshots/
 .DS_Store
 
 dist/
+release-assets*/

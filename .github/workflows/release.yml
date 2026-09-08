@@ -1,0 +1,162 @@
+﻿name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Semver tag to validate, for example v0.1.0"
+        required: true
+        default: "v0.1.0"
+      create_draft_release:
+        description: "Create or update a GitHub draft release"
+        required: true
+        type: boolean
+        default: false
+      push_ghcr:
+        description: "Push Docker image to GHCR. Manual only. Defaults off."
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+jobs:
+  release:
+    name: Build release artifacts
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+      PUSH_GHCR: ${{ github.event_name == 'workflow_dispatch' && inputs.push_ghcr || false }}
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ultrasearch-mcp
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "RELEASE_TAG must look like v0.1.0" >&2; exit 1 ;;
+          esac
+          echo "VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+          echo "release tag: $RELEASE_TAG"
+          echo "release version: ${RELEASE_TAG#v}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm release:validate "$RELEASE_TAG"
+
+      - name: Test and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec tsc --noEmit
+          pnpm lint
+          pnpm test
+          pnpm build
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-assets
+          mkdir -p release-assets
+          npm publish --dry-run --access public
+          npm pack --pack-destination release-assets
+          cp server.json release-assets/server.json
+          cp CHANGELOG.md release-assets/CHANGELOG.md
+          cp docs/one-click-release-plan.md release-assets/one-click-release-plan.md
+      - name: Build MCPB artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm mcpb:stage
+          npx -y @anthropic-ai/mcpb validate dist/mcpb
+          npx -y @anthropic-ai/mcpb pack dist/mcpb "release-assets/ultrasearch-mcp-${VERSION}.mcpb"
+          npx -y @anthropic-ai/mcpb clean "release-assets/ultrasearch-mcp-${VERSION}.mcpb"
+          npx -y @anthropic-ai/mcpb info "release-assets/ultrasearch-mcp-${VERSION}.mcpb" > release-assets/mcpb-info.txt
+
+      - name: Build Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --pull=false \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
+            --iidfile release-assets/docker-image-id.txt \
+            -t "ultrasearch-mcp:${VERSION}" \
+            .
+          docker image inspect "ultrasearch-mcp:${VERSION}" \
+            --format '{{ index .Config.Labels "io.modelcontextprotocol.server.name" }}' \
+            > release-assets/docker-mcp-label.txt
+          test "$(cat release-assets/docker-mcp-label.txt)" = "io.github.solresearchlabs/ultrasearch-mcp"
+      - name: Optionally push GHCR image
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.push_ghcr }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+          docker tag "ultrasearch-mcp:${VERSION}" "$IMAGE_NAME:${VERSION}"
+          docker tag "ultrasearch-mcp:${VERSION}" "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:${VERSION}"
+          docker push "$IMAGE_NAME:latest"
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+          cat release-assets/SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultrasearch-mcp-${{ env.VERSION }}-release-assets
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Create draft GitHub release
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_draft_release) }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="release-assets/CHANGELOG.md"
+          if [ -f "docs/release-notes/${RELEASE_TAG}.md" ]; then
+            notes="docs/release-notes/${RELEASE_TAG}.md"
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --draft \
+            --verify-tag \
+            --title "UltraSearch MCP ${RELEASE_TAG}" \
+            --notes-file "$notes"
+
