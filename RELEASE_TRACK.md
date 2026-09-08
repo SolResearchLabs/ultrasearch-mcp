@@ -116,3 +116,26 @@ Remaining before release planning:
 - Public GitHub Actions CI readback
 - Optional live TinyFish smoke in this new repo once a repo or org secret is available
 - npm publish dry run
+
+## 2026-09-08 public push checkpoint
+
+Initial public commit:
+
+- Commit: `941bc9a74c4a33fb85f43cb85c0067ecd609cd62`
+- Message: `Initial UltraSearch MCP release import`
+- Files: 164
+- Insertions: 24762
+- Push target: `SolResearchLabs/ultrasearch-mcp main`
+
+Public CI readback for initial commit:
+
+- Workflow: `CI`
+- Run: `34274303003`
+- Status: completed
+- Conclusion: success
+- Head SHA: `941bc9a74c4a33fb85f43cb85c0067ecd609cd62`
+
+Current next step after this checkpoint commit:
+
+- Add live TinyFish smoke for this public repo after placing a repo or org secret named `ULTRASEARCH_TINYFISH_API_KEY` or `TINYFISH_API_KEY`.
+- Run `npm pack --dry-run` and inspect package contents before the first npm release.
