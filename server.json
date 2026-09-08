@@ -1,0 +1,79 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.solresearchlabs/ultrasearch-mcp",
+  "title": "UltraSearch MCP",
+  "description": "Production-grade web research MCP server with SearXNG, hosted fallback providers, fetch, crawl, summarization, provenance, and budget guardrails.",
+  "repository": {
+    "url": "https://github.com/SolResearchLabs/ultrasearch-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@solresearchlabs/ultrasearch-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ULTRASEARCH_SEARXNG_URL",
+          "description": "Optional SearXNG base URL for local-first search.",
+          "isRequired": false,
+          "format": "uri",
+          "isSecret": false
+        },
+        {
+          "name": "ULTRASEARCH_HOSTED_FALLBACK_ENABLED",
+          "description": "Set to true to allow hosted provider fallback.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "ULTRASEARCH_PROVIDER_ORDER",
+          "description": "Comma-separated hosted provider order. Example: tinyfish,exa,parallel,brave.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "ULTRASEARCH_TINYFISH_API_KEY",
+          "description": "Optional TinyFish API key. Required only when TinyFish hosted fallback is used.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "ULTRASEARCH_EXA_API_KEY",
+          "description": "Optional Exa API key. Required only when Exa hosted fallback is used.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "ULTRASEARCH_PARALLEL_API_KEY",
+          "description": "Optional Parallel API key. Required only when Parallel hosted fallback is used.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "ULTRASEARCH_BRAVE_API_KEY",
+          "description": "Optional Brave Search API key. Required only when Brave hosted fallback is used.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "ULTRASEARCH_TINYFISH_LOCATION",
+          "description": "Optional two-letter TinyFish search location, such as US or CA.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

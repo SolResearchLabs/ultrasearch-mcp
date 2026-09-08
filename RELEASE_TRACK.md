@@ -112,3 +112,74 @@ Public CI milestones:
 5. Run MCP protocol smoke if transport or package entrypoint changed.
 6. Commit and push only after validation is green.
 7. After push, read back public CI status before planning the npm release.
+
+## 2026-09-08 one-click product plan
+
+User correction accepted: UltraSearch MCP is a package, not a hosted key service. Users bring their own keys through their MCP host, local env, Docker secret store, or local config.
+
+Research-backed release direction:
+
+- MCP Registry: publish metadata with `server.json` after package artifact is public.
+- npm: package identity must match `server.json` through `package.json#mcpName`.
+- Claude Desktop: ship `.mcpb` for one-click install and host-managed sensitive fields.
+- VS Code, Cursor, and Copilot: ship input-variable examples so users are prompted for keys.
+- Docker: ship OCI image and Docker secret oriented docs.
+
+Persistent plan file:
+
+- `docs/one-click-release-plan.md`
+Implemented in this pass:
+
+- Added `server.json` registry metadata draft.
+- Added `package.json#mcpName`.
+- Added Docker MCP Registry OCI label.
+- Added `mcpb/manifest.json` with Claude user config and sensitive API key fields.
+- Added `scripts/build-mcpb.mjs` staging script.
+- Added `examples/vscode-mcp.json` using host input variables.
+- Reframed README around install paths, not manual repo cloning.
+
+Next validation:
+
+1. JSON parse for manifests and examples.
+2. `pnpm install --frozen-lockfile`.
+3. `pnpm lint && pnpm test && pnpm build`.
+4. `pnpm mcpb:stage`.
+5. `npm pack --dry-run` inspection.
+6. Docker build.
+7. Push only after green checks.
+
+## 2026-09-08 one-click implementation checkpoint
+
+Implemented and validated:
+
+- `server.json`: JSON parse PASS.
+- `package.json#mcpName`: matches `server.json` name.
+- Docker OCI label: `io.modelcontextprotocol.server.name=io.github.solresearchlabs/ultrasearch-mcp`.
+- `mcpb/manifest.json`: MCPB CLI validation PASS.
+- `examples/vscode-mcp.json`: JSON parse PASS and uses input variables for secrets.
+- `scripts/build-mcpb.mjs`: stages a bundle with build output, production dependencies, domains data, README, license, and notice.
+- `docs/one-click-release-plan.md`: persistent product plan added.
+
+Validation results:
+
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm exec tsc --noEmit`: PASS.
+- `pnpm lint`: PASS.
+- `pnpm test`: PASS, 61 files, 651 tests, no type errors.
+- `pnpm build`: PASS.
+- `pnpm mcpb:stage`: PASS.
+- `npx @anthropic-ai/mcpb validate dist/mcpb`: PASS.
+- `npx @anthropic-ai/mcpb pack dist/mcpb dist/ultrasearch-mcp-v0.1.0.mcpb`: PASS.
+- `npx @anthropic-ai/mcpb clean dist/ultrasearch-mcp-v0.1.0.mcpb`: PASS.
+- MCPB SHA-256 after clean: `0cceaa3c7a1e832b92488eebdb661c5e88e25db303bc232ee0e0d763654b0622`.
+- `npm pack --dry-run`: PASS, 144 files, 109.3 kB package, 384.0 kB unpacked.
+- Docker build tag `ultrasearch-mcp:one-click`: PASS.
+- Docker manifest list: `sha256:41d0fe1be45068f179dde03d2f8e19d3b5a3e90bf0d8f3bd670db23df1564f8a`.
+
+Remaining before public v0.1.0 tag:
+
+- Push this checkpoint and confirm GitHub Actions CI.
+- Test MCPB in Claude Desktop manually.
+- Optional live TinyFish smoke using maintainer local env/config only.
+- Publish npm package, then publish MCP Registry metadata.
+- Decide whether to publish GHCR image in v0.1.0 or v0.2.0.

@@ -47,3 +47,14 @@ For Docker changes, run a Docker build and record the result in `RELEASE_TRACK.m
 ## Secrets
 
 Use placeholder examples only. Never paste real provider keys into docs, tests, issues, logs, or examples.
+
+## One-click release track
+
+Before changing install, package, registry, MCPB, Docker, or release behavior, read:
+
+- `RELEASE_TRACK.md`
+- `docs/one-click-release-plan.md`
+- `server.json`
+- `mcpb/manifest.json`
+
+Package users bring their own provider keys at runtime. Do not design flows that require user keys in this public repository.

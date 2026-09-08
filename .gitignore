@@ -6,3 +6,5 @@ coverage/
 !.env.example
 domain-db-snapshots/
 .DS_Store
+
+dist/

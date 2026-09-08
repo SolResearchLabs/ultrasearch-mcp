@@ -1,0 +1,134 @@
+{
+  "manifest_version": "0.3",
+  "name": "ultrasearch-mcp",
+  "display_name": "UltraSearch MCP",
+  "version": "0.1.0",
+  "description": "Production-grade web research tools for Claude Desktop.",
+  "long_description": "UltraSearch MCP adds search, fetch, crawl, summarization, provider provenance, and budget-aware hosted fallback to Claude Desktop. Use local SearXNG, your own hosted provider keys, or both.",
+  "author": {
+    "name": "Sol Research Labs",
+    "url": "https://github.com/SolResearchLabs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SolResearchLabs/ultrasearch-mcp.git"
+  },
+  "homepage": "https://github.com/SolResearchLabs/ultrasearch-mcp",
+  "documentation": "https://github.com/SolResearchLabs/ultrasearch-mcp#readme",
+  "support": "https://github.com/SolResearchLabs/ultrasearch-mcp/issues",
+  "license": "MIT",
+  "keywords": ["mcp", "search", "web research", "searxng", "tinyfish", "exa", "parallel", "brave"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "build/src/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/build/src/index.js"],
+      "env": {
+        "ULTRASEARCH_TRANSPORT": "stdio",
+        "ULTRASEARCH_SEARXNG_URL": "${user_config.searxng_url}",
+        "ULTRASEARCH_HOSTED_FALLBACK_ENABLED": "${user_config.hosted_fallback_enabled}",
+        "ULTRASEARCH_PROVIDER_ORDER": "${user_config.provider_order}",
+        "ULTRASEARCH_TINYFISH_API_KEY": "${user_config.tinyfish_api_key}",
+        "ULTRASEARCH_EXA_API_KEY": "${user_config.exa_api_key}",
+        "ULTRASEARCH_PARALLEL_API_KEY": "${user_config.parallel_api_key}",
+        "ULTRASEARCH_BRAVE_API_KEY": "${user_config.brave_api_key}",
+        "ULTRASEARCH_TINYFISH_LOCATION": "${user_config.tinyfish_location}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search the web through SearXNG or hosted fallback providers."
+    },
+    {
+      "name": "search_and_fetch",
+      "description": "Search and fetch relevant page content in one tool call."
+    },
+    {
+      "name": "fetch_url",
+      "description": "Fetch and extract content from a URL."
+    },
+    {
+      "name": "search_and_summarize",
+      "description": "Search the web and synthesize a short summary."
+    },
+    {
+      "name": "crawl_site",
+      "description": "Crawl a site within configured safety limits."
+    },
+    {
+      "name": "domain_stats",
+      "description": "Inspect cached domain statistics."
+    },
+    {
+      "name": "clear_cache",
+      "description": "Clear cached search or fetch state."
+    }
+  ],
+  "user_config": {
+    "searxng_url": {
+      "type": "string",
+      "title": "SearXNG URL",
+      "description": "Optional local SearXNG URL. Leave as default if you do not use SearXNG.",
+      "default": "http://localhost:8080",
+      "required": false
+    },
+    "hosted_fallback_enabled": {
+      "type": "boolean",
+      "title": "Enable hosted fallback",
+      "description": "Use your configured hosted provider keys when local search is unavailable or weak.",
+      "default": false,
+      "required": false
+    },
+    "provider_order": {
+      "type": "string",
+      "title": "Provider order",
+      "description": "Comma-separated provider order.",
+      "default": "tinyfish,exa,parallel,brave",
+      "required": false
+    },
+    "tinyfish_api_key": {
+      "type": "string",
+      "title": "TinyFish API key",
+      "description": "Optional. Required only when TinyFish fallback is used.",
+      "sensitive": true,
+      "required": false
+    },
+    "exa_api_key": {
+      "type": "string",
+      "title": "Exa API key",
+      "description": "Optional. Required only when Exa fallback is used.",
+      "sensitive": true,
+      "required": false
+    },
+    "parallel_api_key": {
+      "type": "string",
+      "title": "Parallel API key",
+      "description": "Optional. Required only when Parallel fallback is used.",
+      "sensitive": true,
+      "required": false
+    },
+    "brave_api_key": {
+      "type": "string",
+      "title": "Brave API key",
+      "description": "Optional. Required only when Brave fallback is used.",
+      "sensitive": true,
+      "required": false
+    },
+    "tinyfish_location": {
+      "type": "string",
+      "title": "TinyFish location",
+      "description": "Optional two-letter location code such as US or CA.",
+      "default": "US",
+      "required": false
+    }
+  }
+}

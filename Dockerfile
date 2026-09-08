@@ -1,20 +1,7 @@
-﻿# syntax=docker/dockerfile:1
-# UltraSearch MCP server image - builds @solresearchlabs/ultrasearch-mcp (feature/cloudflare-crawl
-# fork). GIT_SHA build arg stamps the built revision; the deployment compose
-# defaults it to the pinned deployable SHA.
-#
-# Generic build/runtime infrastructure for the public MCP source: no secrets, no
-# private-registry references, no production-host assumptions.
-#
-# Notes:
-#   - pnpm 10 blocks dependency build scripts by default. `--ignore-scripts` is
-#     the reproducible choice here: the only blocked script in the tree is
-#     protobufjs's postinstall, which is a no-op version-scheme diagnostic (its
-#     dist ships prebuilt). Nothing in production needs a build step, so an
-#     onlyBuiltDependencies allowlist is unnecessary.
-#   - `domains.json` is read at runtime from the repo root (src/domains.ts
-#     resolves ../../domains.json from build/src/), so it is copied in.
-#   - version.ts walks up to the nearest package.json at startup - retained.
+# syntax=docker/dockerfile:1
+# UltraSearch MCP server image.
+# Generic build and runtime infrastructure for the public MCP package.
+# No secrets, private registry references, or production host assumptions.
 
 ARG GIT_SHA=unknown
 
@@ -45,7 +32,8 @@ RUN chown -R node:node /app
 USER node
 EXPOSE 3001
 LABEL org.opencontainers.image.source="https://github.com/SolResearchLabs/ultrasearch-mcp" \
-      org.opencontainers.image.revision="${GIT_SHA}"
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      io.modelcontextprotocol.server.name="io.github.solresearchlabs/ultrasearch-mcp"
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=15s \
   CMD node -e "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["node", "build/src/index.js"]

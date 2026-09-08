@@ -1,0 +1,44 @@
+{
+  "inputs": [
+    {
+      "id": "ultrasearch-tinyfish-api-key",
+      "type": "promptString",
+      "description": "TinyFish API key for UltraSearch hosted fallback",
+      "password": true
+    },
+    {
+      "id": "ultrasearch-exa-api-key",
+      "type": "promptString",
+      "description": "Optional Exa API key for UltraSearch hosted fallback",
+      "password": true
+    },
+    {
+      "id": "ultrasearch-parallel-api-key",
+      "type": "promptString",
+      "description": "Optional Parallel API key for UltraSearch hosted fallback",
+      "password": true
+    },
+    {
+      "id": "ultrasearch-brave-api-key",
+      "type": "promptString",
+      "description": "Optional Brave Search API key for UltraSearch hosted fallback",
+      "password": true
+    }
+  ],
+  "servers": {
+    "ultrasearch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@solresearchlabs/ultrasearch-mcp"],
+      "env": {
+        "ULTRASEARCH_TRANSPORT": "stdio",
+        "ULTRASEARCH_HOSTED_FALLBACK_ENABLED": "true",
+        "ULTRASEARCH_PROVIDER_ORDER": "tinyfish,exa,parallel,brave",
+        "ULTRASEARCH_TINYFISH_API_KEY": "${input:ultrasearch-tinyfish-api-key}",
+        "ULTRASEARCH_EXA_API_KEY": "${input:ultrasearch-exa-api-key}",
+        "ULTRASEARCH_PARALLEL_API_KEY": "${input:ultrasearch-parallel-api-key}",
+        "ULTRASEARCH_BRAVE_API_KEY": "${input:ultrasearch-brave-api-key}"
+      }
+    }
+  }
+}
