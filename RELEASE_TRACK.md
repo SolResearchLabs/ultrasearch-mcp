@@ -466,3 +466,17 @@ Local validation before commit:
 - tracked TinyFish-shaped secret scan, JSON parse, dash hygiene, and diff whitespace: PASS.
 
 Local test MCPB copied to Desktop: `ultrasearch-mcp-0.1.0-sdkv2-stdio-local.mcpb`, SHA-256 `0bf41a8e19fb1f4d9fb6d66b1a0d2fb3d109c84788d822d355de3f1641ba6237`.
+
+Public validation after SDK v2 stdio hybrid commit:
+
+- Commit: `f038dda8320579349dc65fd910e05ea353b5186d`.
+- Public CI run: `34308641253`, conclusion `success`.
+- Public Release dry run: `34308792780`, conclusion `success`.
+- Release artifact name: `ultrasearch-mcp-0.1.0-release-assets`.
+- Release artifact id: `10087639940`.
+- Release artifact digest: `sha256:0cfb61387024f39360e15bf32bbf2d1d9f195e76e0ec85e993babed803250388`.
+- Downloaded artifact checksum verification: PASS for all `SHA256SUMS.txt` entries.
+- CI-built MCPB copied to Desktop as `ultrasearch-mcp-0.1.0-ci-sdkv2-stdio.mcpb`.
+- CI-built MCPB SHA-256: `8c4420e9eaa9e84e8bad2e5adf464bd9312bbd9a4429d1e2dcb2e4fe3e410e54`.
+
+Next human gate: remove the old UltraSearch extension from Claude Desktop and install the CI-built SDK v2 stdio MCPB from Desktop. If Claude still closes Cowork/Code, inspect Claude extension logs around `03:54Z+` and do not tag v0.1.0.
