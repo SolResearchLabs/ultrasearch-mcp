@@ -655,3 +655,65 @@ Release decision:
 - this hardening commit is post-tag on `main`
 - do not move the existing tag without explicit approval
 - next clean public release decision is either `v0.1.1` or an explicitly approved retag/draft update
+
+## Lazy tool-handler startup hardening - 2026-09-09
+
+Commit:
+- `04547a966966776e98682ffccc42a5f0272727c2`
+- message: `perf: lazy load tool handlers`
+
+Problem:
+- Claude Desktop startup and tool execution timeout hardening were fixed, but one fresh hoisted MCPB install showed `tools/list` taking about 27 seconds.
+- A direct installed-payload cold run reproduced the risk: first `tools/list` took 11.3 seconds, second warm run took 0.97 seconds.
+- Repo build output was fast, so the slow path was specific to the hoisted MCPB/Desktop layout on Windows.
+
+Root cause:
+- `src/tools.ts` imported the heavy execution graph before the server could answer `tools/list`.
+- Heavy imports included search, fetch, crawl, cache, observability, Ollama, reranker, and extraction/fetch dependencies.
+- `tools/list` only needs tool schemas and metadata, not the execution handlers.
+
+Fix:
+- split the heavy implementation into `src/tool-handlers.ts`
+- keep `src/tools.ts` as the lightweight schema and registration surface
+- export lazy wrapper functions from `src/tools.ts` so handlers load only when a tool is actually called
+- preserve all seven tool names and public schemas
+
+Local validation:
+- typecheck, lint, build: PASS
+- test suite: 61 files, 656 tests: PASS
+- `smoke-stdio-bootstrap`: PASS
+- `smoke-stdio-tool-timeout`: PASS
+- release metadata validation: PASS
+- npm publish dry run and npm pack dry run: PASS
+- MCPB pack, clean, info, unpack, layout: PASS
+- Docker build and MCP label: PASS
+- changed-file secret-shape scan and diff check: PASS
+
+Performance proof:
+- staged hoisted MCPB `server/discover`: about 27-36 ms
+- staged hoisted MCPB `tools/list`: about 222-287 ms across five runs
+- CI-built MCPB `server/discover`: about 28-42 ms
+- CI-built MCPB `tools/list`: about 235-257 ms across three runs
+
+Public validation:
+- CI run: `34370789231`, conclusion `success`
+- Release dry run: `34370974744`, conclusion `success`
+- Release artifact id: `10111945857`
+- Release artifact digest: `sha256:a5735dc8688365ef9b048d55d5faa35bcb67d261a0f7d08b796b034a4c928fad`
+- CI MCPB sha256: `542d4066e766db547bb34f1f5c94eab1272a63c21ce7eab26ebecaeb63d1762e`
+- Desktop copy: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-ci-lazy-tools.mcpb`
+
+Claude validation:
+- unsupported disk replacement was used only for local validation, with backup made first
+- installed registry hash updated to `542d4066e766db547bb34f1f5c94eab1272a63c21ce7eab26ebecaeb63d1762e`
+- installed payload contains top-level `@modelcontextprotocol/core`: PASS
+- settings preserved: enabled, 10 userConfig keys
+- fresh Claude Desktop restart negotiated modern protocol and returned `tools/list`
+- real Desktop log: `tools/list` request at `2026-09-09T15:36:56.070Z`, response at `2026-09-09T15:36:56.512Z`
+- main log: `Connected to UltraSearch MCP (7 tools)` and announced 7 tools in the same second
+
+Release decision:
+- `v0.1.0` remains tagged at `ff58d8b4046d032819f77fce7c8f6463c5c8e6d9`
+- this performance hardening commit is post-tag on `main`
+- do not move the existing tag without explicit approval
+- next clean public release decision is either `v0.1.1` or an explicitly approved retag/draft update
