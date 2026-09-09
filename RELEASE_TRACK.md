@@ -510,3 +510,18 @@ Local validation:
 Local test artifact:
 `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-modern-replay-fix-local.mcpb`
 sha256: `193ba126e2e459de4f4f2d12f1c1b511523e43019470035bc4fa430a4d9fd69e`
+
+Public CI and release dry run for modern replay fix - 2026-09-09:
+
+- commit: `82feefb428c2542688aefe56957cd9dde588aa69`
+- CI run: `34310780877`, conclusion `success`
+- Release dry run: `34310906108`, conclusion `success`
+- Release steps completed: metadata validation, test/build, `smoke-stdio-bootstrap`, npm dry run, npm pack, MCPB validate/pack/clean/info, Docker build, Docker MCP label, checksums, artifact upload
+- GHCR push: skipped intentionally
+- draft GitHub Release: skipped intentionally
+- artifact id: `10088355536`
+- artifact digest: `sha256:8f961c42de7b620a0022f87a60d87725e6352895347b9848a0cea4c69a2d6b34`
+- CI MCPB desktop copy: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-ci-modern-replay-fix.mcpb`
+- CI MCPB sha256: `6bc1903d0a84a8af72f52049553561bcb1d0a82373815c8a7b14e43855db6e59`
+
+Next gate: install the CI MCPB in Claude Desktop and confirm whether the Cowork/Code shared-pool session stays connected after `tools/list`.
