@@ -25,5 +25,6 @@ jobs:
           pnpm test
           pnpm build
           node scripts/smoke-stdio-bootstrap.mjs
+          node scripts/smoke-stdio-tool-timeout.mjs
       - name: Docker build
         run: docker build -t ultrasearch-mcp:ci .

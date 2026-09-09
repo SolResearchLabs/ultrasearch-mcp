@@ -255,3 +255,24 @@ describe("URL trailing-slash normalization for KIWIX_URL/HISTER_URL", () => {
     expect(HISTER_URL).toBe("");
   });
 });
+
+describe("MCP tool and DNS timeout parsing", () => {
+  it("uses bounded safe defaults", async () => {
+    const { DNS_LOOKUP_TIMEOUT_MS, MCP_TOOL_TIMEOUT_MS } = await import(
+      "../src/config.js"
+    );
+    expect(MCP_TOOL_TIMEOUT_MS).toBe(110_000);
+    expect(DNS_LOOKUP_TIMEOUT_MS).toBe(5_000);
+  });
+
+  it("caps overly large timeout env values", async () => {
+    vi.resetModules();
+    process.env.MCP_TOOL_TIMEOUT_MS = "999999";
+    process.env.DNS_LOOKUP_TIMEOUT_MS = "999999";
+    const { DNS_LOOKUP_TIMEOUT_MS, MCP_TOOL_TIMEOUT_MS } = await import(
+      "../src/config.js"
+    );
+    expect(MCP_TOOL_TIMEOUT_MS).toBe(210_000);
+    expect(DNS_LOOKUP_TIMEOUT_MS).toBe(30_000);
+  });
+});

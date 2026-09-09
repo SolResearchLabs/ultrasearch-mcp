@@ -80,6 +80,20 @@ export const CACHE_MAX_RETRIES_PER_REQUEST = positiveIntEnv(
   "CACHE_MAX_RETRIES_PER_REQUEST",
   2,
 );
+
+// Bound MCP tool calls below common desktop bridge timeouts. This is a
+// defensive wall-clock deadline: individual network tiers still keep their
+// narrower local timeouts, but a stuck DNS/provider/fetch path cannot leave a
+// Claude Desktop tool call pending until the host gives up.
+export const MCP_TOOL_TIMEOUT_MS = Math.min(
+  positiveIntEnv("MCP_TOOL_TIMEOUT_MS", 110_000),
+  210_000,
+);
+
+export const DNS_LOOKUP_TIMEOUT_MS = Math.min(
+  positiveIntEnv("DNS_LOOKUP_TIMEOUT_MS", 5_000),
+  30_000,
+);
 export const OLLAMA_URL = process.env.OLLAMA_URL ?? "";
 export const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY ?? "";
 export const OLLAMA_EXPAND_MODEL =

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { cacheClear } from "./cache.js";
+import { MCP_TOOL_TIMEOUT_MS } from "./config.js";
 import { newRequestId, withRequestId } from "./context.js";
 import { crawlSite, formatCrawlManifest } from "./crawl.js";
 import { getDomainRecord } from "./domain-db.js";
@@ -72,12 +73,44 @@ function buildResearchRoute(
   return research.search || research.fetch ? research : undefined;
 }
 
+class ToolTimeoutError extends Error {
+  constructor(toolName: string, timeoutMs: number) {
+    super(
+      `${toolName} timed out after ${timeoutMs}ms; returning before the MCP host deadline`,
+    );
+    this.name = "ToolTimeoutError";
+  }
+}
+
+async function withToolDeadline<T>(
+  toolName: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(
+          () => reject(new ToolTimeoutError(toolName, MCP_TOOL_TIMEOUT_MS)),
+          MCP_TOOL_TIMEOUT_MS,
+        );
+        timeout.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 async function instrumentTool<T>(
   toolName: string,
   fn: () => Promise<T>,
 ): Promise<T> {
   return withRequestId(newRequestId(), () =>
-    withSpan(`tool.${toolName}`, { "mcp.tool": toolName }, fn),
+    withSpan(`tool.${toolName}`, { "mcp.tool": toolName }, () =>
+      withToolDeadline(toolName, fn),
+    ),
   );
 }
 

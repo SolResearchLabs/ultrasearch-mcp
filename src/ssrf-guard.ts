@@ -19,6 +19,7 @@ import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import { lookup as dnsLookupAsync } from "node:dns/promises";
 import { isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
+import { DNS_LOOKUP_TIMEOUT_MS } from "./config.js";
 
 export class SsrfBlockedError extends Error {
   // The resolved `address` is kept as a property for programmatic use but is
@@ -212,6 +213,24 @@ export const ssrfGuardedDispatcher: Dispatcher = new Agent({
  * resolution failure is not treated as a block: let the downstream fetch
  * surface its own DNS error rather than masking it here.
  */
+function dnsTimeout(hostname: string): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(
+      () => reject(new Error(`DNS lookup timed out for ${hostname}`)),
+      DNS_LOOKUP_TIMEOUT_MS,
+    );
+  });
+}
+
+async function resolvePublicWithTimeout(
+  hostname: string,
+): Promise<LookupAddress[]> {
+  return Promise.race([
+    dnsLookupAsync(hostname, { all: true }),
+    dnsTimeout(hostname),
+  ]);
+}
+
 export async function assertResolvedPublic(url: string): Promise<void> {
   let hostname: string;
   try {
@@ -227,7 +246,7 @@ export async function assertResolvedPublic(url: string): Promise<void> {
   }
   let results: LookupAddress[];
   try {
-    results = await dnsLookupAsync(hostname, { all: true });
+    results = await resolvePublicWithTimeout(hostname);
   } catch {
     return; // resolution failure - not an SSRF block
   }

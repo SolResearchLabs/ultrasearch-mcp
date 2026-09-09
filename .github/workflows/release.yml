@@ -81,6 +81,7 @@ jobs:
           pnpm test
           pnpm build
           node scripts/smoke-stdio-bootstrap.mjs
+          node scripts/smoke-stdio-tool-timeout.mjs
 
       - name: Prepare release assets
         shell: bash

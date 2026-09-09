@@ -169,4 +169,13 @@ describe("assertResolvedPublic", () => {
       assertResolvedPublic("https://nope.example/"),
     ).resolves.toBeUndefined();
   });
+
+  it("treats a DNS lookup timeout as a non-blocking resolution failure", async () => {
+    vi.useFakeTimers();
+    mockLookup.mockReturnValueOnce(new Promise(() => {}) as never);
+    const result = assertResolvedPublic("https://slow-dns.example/");
+    await vi.advanceTimersByTimeAsync(5_001);
+    await expect(result).resolves.toBeUndefined();
+    vi.useRealTimers();
+  });
 });
