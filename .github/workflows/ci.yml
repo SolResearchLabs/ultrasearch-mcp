@@ -24,5 +24,6 @@ jobs:
           pnpm lint
           pnpm test
           pnpm build
+          node scripts/smoke-stdio-bootstrap.mjs
       - name: Docker build
         run: docker build -t ultrasearch-mcp:ci .

@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -80,6 +80,7 @@ jobs:
           pnpm lint
           pnpm test
           pnpm build
+          node scripts/smoke-stdio-bootstrap.mjs
 
       - name: Prepare release assets
         shell: bash
@@ -159,4 +160,3 @@ jobs:
             --verify-tag \
             --title "UltraSearch MCP ${RELEASE_TAG}" \
             --notes-file "$notes"
-

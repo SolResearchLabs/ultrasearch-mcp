@@ -340,3 +340,58 @@ Remaining gate:
 - Uninstall old UltraSearch MCP extension from Claude Desktop.
 - Install the CI-built discovery fix MCPB from Desktop.
 - Confirm the Cowork and Code version negotiation error is gone.
+
+## 2026-09-08 Claude Desktop fast bootstrap fix
+
+The first discovery probe fix was insufficient in real Claude Desktop. The host still logged:
+
+- Cowork and Code startup failed during `server/discover` version negotiation.
+- Claude classified the era probe as legacy, but the shared-pool path still treated the in-place probe close as fatal.
+
+Root cause found:
+
+- The v1 SDK server was able to answer `server/discover`, but only after heavy module imports and runtime initialization.
+- Claude's shared-pool probe can close before that response window.
+- A 750 ms concurrent probe reproduced the issue with zero discovery responses.
+- A stricter 150 ms probe also failed before the bootstrap refactor.
+
+Fix chosen:
+
+- Keep v1 SDK for the v0.1.0 lane.
+- Make `src/index.ts` a minimal stdio bootstrap with no heavy app imports before the first stdio read.
+- Answer first-message `server/discover` immediately with `supportedVersions: []` and `capabilities: {}`.
+- Pause stdin after the first line so a fast follow-up `initialize` is preserved.
+- Move heavy server startup to `src/server-entry.ts` and import it only after the probe response.
+- Add `scripts/smoke-stdio-bootstrap.mjs` and run it in CI and Release workflows.
+
+Local validation after fast bootstrap:
+
+- `package.json` BOM cleanup: PASS.
+- `pnpm install --frozen-lockfile`: PASS.
+- `pnpm exec tsc --noEmit`: PASS.
+- `pnpm lint`: PASS.
+- `pnpm test`: PASS, 61 files, 651 tests, no type errors.
+- `pnpm build`: PASS.
+- `scripts/smoke-stdio-bootstrap.mjs`: PASS.
+- 150 ms `server/discover` response: PASS.
+- 300 ms `server/discover` response: PASS.
+- 750 ms `server/discover` response: PASS.
+- Same-pipe `server/discover` plus `initialize`: PASS.
+- SDK stdio client tool list: PASS, 7 tools.
+- MCPB `info`, `unpack`, and manifest validation: PASS.
+- MCPB `verify`: expected unsigned dry-run failure.
+- Docker build: PASS.
+- Docker MCP label JSON readback: `io.github.solresearchlabs/ultrasearch-mcp`.
+
+Fixed local test artifact:
+
+- Path: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-fast-bootstrap.mcpb`
+- SHA-256: `02b716b1d6bfa2652fd55003f6427c3319f3471a8272836a4be88e6f1384f073`
+
+Next gate:
+
+1. Commit and push the fast bootstrap fix.
+2. Confirm public CI on the exact commit.
+3. Run Release workflow dry run with `create_draft_release=false` and `push_ghcr=false`.
+4. Download the CI-built MCPB artifact.
+5. Install that artifact in Claude Desktop and confirm Cowork and Code startup.

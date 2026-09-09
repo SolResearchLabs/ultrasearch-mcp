@@ -30,7 +30,8 @@
     "pack:dry": "npm pack --dry-run",
     "mcpb:stage": "pnpm build && node scripts/build-mcpb.mjs",
     "mcpb:pack": "pnpm build && node scripts/build-mcpb.mjs && npx -y @anthropic-ai/mcpb pack dist/mcpb",
-    "release:validate": "node scripts/validate-release-metadata.mjs"
+    "release:validate": "node scripts/validate-release-metadata.mjs",
+    "smoke:stdio-bootstrap": "pnpm build && node scripts/smoke-stdio-bootstrap.mjs"
   },
   "keywords": [
     "mcp",
