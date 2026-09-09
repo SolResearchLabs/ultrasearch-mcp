@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createServer } from "node:http";
+import { PassThrough } from "node:stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -68,6 +69,107 @@ const createSearxngServer = () => {
   return server;
 };
 
+type InitialStdioMessage = {
+  raw: Buffer;
+  line: string;
+  rest: Buffer;
+};
+
+const readInitialStdioMessage = async (): Promise<InitialStdioMessage | null> =>
+  new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+
+    const cleanup = () => {
+      process.stdin.off("data", onData);
+      process.stdin.off("end", onEnd);
+      process.stdin.off("error", onError);
+    };
+
+    const finish = (value: InitialStdioMessage | null) => {
+      cleanup();
+      resolve(value);
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const onEnd = () => finish(null);
+
+    const onData = (chunk: Buffer) => {
+      chunks.push(chunk);
+      const buffered = Buffer.concat(chunks);
+      const newlineIndex = buffered.indexOf("\n");
+      if (newlineIndex === -1) return;
+
+      finish({
+        raw: buffered.subarray(0, newlineIndex + 1),
+        line: buffered.toString("utf8", 0, newlineIndex).replace(/\r$/, ""),
+        rest: buffered.subarray(newlineIndex + 1),
+      });
+    };
+
+    process.stdin.on("data", onData);
+    process.stdin.once("end", onEnd);
+    process.stdin.once("error", onError);
+    process.stdin.resume();
+  });
+
+const isServerDiscoverRequest = (line: string): { id: unknown } | null => {
+  try {
+    const message = JSON.parse(line) as { id?: unknown; method?: unknown };
+    return message.method === "server/discover" && "id" in message
+      ? { id: message.id }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const sendLegacyDiscoverResponse = (id: unknown) => {
+  process.stdout.write(
+    `${JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      result: {
+        supportedVersions: [],
+        capabilities: {},
+        _meta: {
+          "io.modelcontextprotocol/serverInfo": {
+            name: "ultrasearch-mcp",
+            version: VERSION,
+          },
+        },
+        instructions:
+          "UltraSearch MCP serves the legacy initialize-based MCP stdio transport.",
+      },
+    })}\n`,
+  );
+};
+
+const connectStdioServer = async (server: McpServer) => {
+  const initial = await readInitialStdioMessage();
+  const stdin = new PassThrough();
+
+  if (initial) {
+    const discover = isServerDiscoverRequest(initial.line);
+    if (discover) {
+      sendLegacyDiscoverResponse(discover.id);
+    } else {
+      stdin.write(initial.raw);
+    }
+
+    if (initial.rest.length > 0) {
+      stdin.write(initial.rest);
+    }
+  }
+
+  process.stdin.pipe(stdin);
+  const transport = new StdioServerTransport(stdin, process.stdout);
+  await server.connect(transport);
+};
+
 const shutdown = async () => {
   await Promise.allSettled([shutdownObservability(), shutdownEvents()]);
   process.exit(0);
@@ -96,6 +198,5 @@ if (TRANSPORT === "http") {
   });
 } else {
   const server = createSearxngServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await connectStdioServer(server);
 }

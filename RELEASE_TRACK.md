@@ -274,3 +274,40 @@ Next release gate:
 3. If MCPB install passes, cut tag `v0.1.0`.
 4. Let tag workflow create the draft GitHub Release.
 5. Publish npm and MCP Registry only after final human approval.
+
+## 2026-09-08 Claude Desktop discovery probe fix
+
+Real Claude Desktop MCPB install surfaced a host compatibility blocker:
+
+- Claude Desktop installed the MCPB UI path, but Cowork and Code shared-pool sessions failed startup.
+- Error class: version negotiation failed during `server/discover` probe.
+- Main legacy session could start, but the shared-pool path treated the in-place probe failure as fatal.
+
+Fix chosen:
+
+- Keep the v1 SDK for the v0.1.0 release lane.
+- Do not attempt the larger SDK v2 migration inside the release cut.
+- Add a stdio preflight wrapper that answers a first-message `server/discover` request with a valid no-modern-versions result.
+- Then hand the same stdio stream to the existing v1 SDK server for normal initialize-based MCP.
+
+Validation after fix:
+
+- `pnpm exec tsc --noEmit`: PASS.
+- `pnpm lint`: PASS.
+- `pnpm test`: PASS, 61 files, 651 tests, no type errors.
+- `pnpm build`: PASS.
+- Raw `server/discover` probe: PASS, returns JSON-RPC result with `supportedVersions: []`.
+- v1 SDK stdio client smoke: PASS, 7 tools listed.
+- v2 auto-negotiating stdio client smoke: PASS, negotiated `legacy`, 7 tools listed.
+- Rebuilt MCPB: PASS.
+
+Fixed local test artifact:
+
+- Path: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-discovery-fix.mcpb`
+- SHA-256: `a2863be4ba25e7b01df030911e636169fe6f2145cc2050de934caf9be348ef17`
+
+Next gate:
+
+- Remove the old UltraSearch MCP extension from Claude Desktop.
+- Install the fixed MCPB artifact.
+- Confirm Cowork and Code sessions start without the version negotiation error.
