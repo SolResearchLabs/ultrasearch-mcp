@@ -10,3 +10,7 @@ domain-db-snapshots/
 dist/
 release-assets*/
 manual-install-gate/
+mcpb.mcpb
+local-backups/
+manual-install-backups/
+CLAUDE_DESKTOP_MCPB_INSTALL_REPORT.md

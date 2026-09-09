@@ -525,3 +525,34 @@ Public CI and release dry run for modern replay fix - 2026-09-09:
 - CI MCPB sha256: `6bc1903d0a84a8af72f52049553561bcb1d0a82373815c8a7b14e43855db6e59`
 
 Next gate: install the CI MCPB in Claude Desktop and confirm whether the Cowork/Code shared-pool session stays connected after `tools/list`.
+
+## Claude Desktop hoisted MCPB install fix - 2026-09-09
+
+Claude Code disk inspection found the installed Claude Desktop extension was still the earlier SDK v2 stdio local bundle, not the newer replay-fix CI bundle. It also found the crash source was MCPB packaging, not protocol handling: `mcpb pack` flattened pnpm symlinks so `@modelcontextprotocol/server` could not resolve `@modelcontextprotocol/core` at runtime inside Claude Desktop.
+
+Fix:
+- change `scripts/build-mcpb.mjs` to install production dependencies with `--node-linker=hoisted`
+- keep the SDK v2 stdio replay fix unchanged
+- ignore local MCPB install artifacts and backup folders
+
+Local packaging proof:
+- `pnpm mcpb:stage`: PASS
+- packed MCPB: `mcpb.mcpb`
+- packed MCPB sha256: `397a66f8b391e9af34ac352344f1088e8e20337f449877460b692fe0caf01c3b`
+- packed size: 12,263,080 bytes
+- unpacked layout contains `node_modules/@modelcontextprotocol/core/dist/index.mjs`: PASS
+- unpacked layout contains `node_modules/@modelcontextprotocol/server/dist`: PASS
+- `@modelcontextprotocol/server` import from the unpacked bundle: PASS
+
+Claude Desktop disk install proof:
+- unsupported disk replacement used only after backing up the existing UltraSearch extension state
+- installed registry hash updated to `397a66f8b391e9af34ac352344f1088e8e20337f449877460b692fe0caf01c3b`
+- installed extension contains top-level `@modelcontextprotocol/core`: PASS
+- Claude Desktop log after replacement shows `Era probe verdict: modern`, `Message from client: method="tools/list"`, then `Message from server: id=0 result` at `2026-09-09T05:07:23.219Z` and again at `2026-09-09T05:09:16.754Z`
+
+Next release gate:
+- commit this packaging fix
+- run public CI
+- run Release workflow dry run
+- download CI-built MCPB and confirm its bundle layout has top-level `@modelcontextprotocol/core`
+- prefer GUI install for final validation, but same-version test installs may require uninstall or cache clear because Claude Desktop keys the local extension by id and version

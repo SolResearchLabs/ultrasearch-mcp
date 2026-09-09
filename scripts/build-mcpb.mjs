@@ -26,7 +26,7 @@ copyRequired(join(repoRoot, "README.md"), join(bundleRoot, "README.md"));
 copyRequired(join(repoRoot, "LICENSE"), join(bundleRoot, "LICENSE"));
 copyRequired(join(repoRoot, "NOTICE.md"), join(bundleRoot, "NOTICE.md"));
 
-execSync("npx -y pnpm@10.30.3 install --prod --frozen-lockfile --ignore-scripts", {
+execSync("npx -y pnpm@10.30.3 install --prod --frozen-lockfile --ignore-scripts --node-linker=hoisted", {
   cwd: bundleRoot,
   stdio: "inherit",
 });
