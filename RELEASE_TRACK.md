@@ -802,3 +802,27 @@ Claude Desktop proof after install:
 
 Next gate:
 - explicit human approval for whether to create tag v0.1.1 and draft GitHub Release.
+
+## v0.1.2 tag, port default, and aggressive Desktop validation - 2026-09-09 19:38:09 UTC
+
+- Source head: e6c1123c638c7b7dbd6e8f0559f2d006ffa40774.
+- Commit: docs: avoid default SearXNG port collision.
+- Version:  .1.2 in package, server metadata, and MCPB manifest.
+- Default Claude Desktop SearXNG URL changed from http://localhost:8080 to http://127.0.0.1:8099.
+- Remaining tracked 8080 references are unrelated Kiwix tests.
+- CI after port patch: run 34394850890, success.
+- Safe release dry run after port patch: run 34395281181, success, no npm publish, no MCP Registry publish, no GHCR push.
+- Tag: 0.1.2 pushed. Tag object 8c831bf0aad7c3e50547596d58cd7efc6e6c6eef, peeled source head e6c1123c638c7b7dbd6e8f0559f2d006ffa40774.
+- Tag-triggered Release workflow: run 34395499578, success.
+- Release artifact: ultrasearch-mcp-0.1.2-release-assets, artifact id 10121373477, digest sha256:be213495828257a04dab57fd997937adeae295c1c54c8b0404fae5ce37d24782.
+- Verified SHA256SUMS.txt for all assets.
+- Tag-built MCPB SHA-256: 713e44205f277bb430d98fbf0d0c6a2a6b948d95b542d6e50f705398ab011e40.
+- Tag-built MCPB layout verified: top-level @modelcontextprotocol/core, @modelcontextprotocol/server, uild/src/index.js, uild/src/tools.js, uild/src/tool-handlers.js, and manifest.json present.
+- Valid Claude-style envelope timing for tag-built MCPB: discover roughly 30-39 ms, 	ools/list roughly 237-270 ms across five cold runs.
+- Installed exact tag-built MCPB into Claude Desktop with preserved extension settings.
+- Claude Desktop registry hash after install: 713e44205f277bb430d98fbf0d0c6a2a6b948d95b542d6e50f705398ab011e40.
+- Claude Desktop fresh log: modern discovery, server started, 	ools/list request at 2026-09-09T19:36:16.913Z, 	ools/list result at 2026-09-09T19:36:17.454Z.
+- Aggressive direct MCP matrix against installed tag payload: control tools passed in 759 ms, search returned a bounded diagnostic in 1008 ms.
+- Search diagnostic with current local stored credentials: SearXNG search failed (fetch failed); hosted fallback did not produce results (exa=unconfigured; parallel=unconfigured; brave=unconfigured; tinyfish=error: TinyFish search error: 401 Unauthorized).
+- New user-provided TinyFish and Firecrawl keys were not written by automation because the tool safety wrapper blocked raw credential transmission. They must be entered through Claude Desktop's extension settings UI, then retested.
+- Release remains draft/unpublished. No npm publish, no MCP Registry publish, no GHCR push, no public GitHub Release publish.
