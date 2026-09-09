@@ -606,3 +606,52 @@ Release rule for v0.1.0:
 - Do not sign the MCPB.
 - Publish `SHA256SUMS.txt` beside the `.mcpb`, npm tarball, `server.json`, and notes.
 - Revisit MCPB signing after a stable trusted certificate path and verifier/install behavior are proven against Claude Desktop.
+
+## MCP tool execution timeout hardening - 2026-09-09
+
+Commit:
+- `4389e4950751dbcea15b2d7185d74f156682b65d`
+- message: `fix: bound MCP tool execution`
+
+Problem:
+- Claude Desktop startup and tool listing were fixed, but a real search execution could leave later `tools/call` requests pending until the host timeout.
+- Local SearXNG was unreachable and Valkey/reranker were fail-soft, so the remaining risk was an unbounded network/tool path.
+
+Fix:
+- add bounded MCP tool execution with `MCP_TOOL_TIMEOUT_MS`
+- add bounded public DNS lookup with `DNS_LOOKUP_TIMEOUT_MS`
+- return a structured tool error before the host bridge deadline instead of leaving the call pending
+- add `smoke-stdio-tool-timeout` to CI and Release workflows
+
+Local validation:
+- typecheck, lint, tests, build: PASS
+- test suite: 61 files, 656 tests: PASS
+- `smoke-stdio-bootstrap`: PASS
+- `smoke-stdio-tool-timeout`: PASS, fake hanging SearXNG returned before host timeout
+- npm pack dry run: PASS
+- MCPB pack/clean/info/unpack/layout/import: PASS
+- Docker build and MCP label: PASS
+- changed-file secret-shape scan and diff check: PASS
+
+Public validation:
+- CI run: `34338203975`, conclusion `success`
+- Release dry run: `34338365658`, conclusion `success`
+- Release artifact id: `10098702000`
+- Release artifact digest: `sha256:b5ca1a6408871d93bdeacadba2748c5a262f636ea7821cbaddbfe739acb2afdf`
+- CI MCPB sha256: `1777cc15eb9728a643f30f04d188d20ca6a81cb493f282b484458c5b8bd405ca`
+- Desktop copy: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-ci-timeout-hardening.mcpb`
+
+Claude validation:
+- unsupported disk replacement was used only for local validation, with backup made first
+- installed registry hash updated to `1777cc15eb9728a643f30f04d188d20ca6a81cb493f282b484458c5b8bd405ca`
+- installed payload contains top-level `@modelcontextprotocol/core`: PASS
+- settings preserved: enabled, 10 userConfig keys
+- fresh Claude Desktop restart negotiated modern protocol and returned `tools/list`
+- `tools/list` response was slow, about 27 seconds, but terminally successful
+- Claude Code forced MCP call against fake hanging SearXNG returned an error after about 3 seconds: PASS
+
+Release decision:
+- `v0.1.0` currently remains tagged at `ff58d8b4046d032819f77fce7c8f6463c5c8e6d9`
+- this hardening commit is post-tag on `main`
+- do not move the existing tag without explicit approval
+- next clean public release decision is either `v0.1.1` or an explicitly approved retag/draft update
