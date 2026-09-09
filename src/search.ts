@@ -16,8 +16,9 @@ import {
 } from "./research-route.js";
 import { configBoolean } from "./runtime-config.js";
 import {
+  describeHostedSearchAttempts,
   hasUsefulPrimarySearch,
-  searchHostedFallback,
+  searchHostedFallbackWithAttempts,
 } from "./search-providers/index.js";
 import type {
   SearchRoute,
@@ -200,8 +201,10 @@ async function primarySearchWithFallback(
     primaryError = err;
   }
 
+  let fallbackAttemptSummary: string | undefined;
+
   if (hostedFallbackAllowed(engines)) {
-    const fallback = await searchHostedFallback({
+    const fallback = await searchHostedFallbackWithAttempts({
       query,
       numResults: fetchCount,
       category,
@@ -209,22 +212,33 @@ async function primarySearchWithFallback(
       language,
       site,
     });
-    if (fallback) {
+    fallbackAttemptSummary = fallback.enabled
+      ? describeHostedSearchAttempts(fallback.attempts)
+      : undefined;
+    if (fallback.result) {
       // Preserve useful SearXNG direct-answer metadata when a live SearXNG
       // request succeeded but its normal result list was too sparse. The
       // route records which hosted provider actually served.
       return {
-        results: fallback.results,
-        meta: primary?.meta ?? fallback.meta,
-        route: { provider: fallback.provider, fallback: true },
+        results: fallback.result.results,
+        meta: primary?.meta ?? fallback.result.meta,
+        route: { provider: fallback.result.provider, fallback: true },
       };
     }
   }
 
   if (primary) return primary;
-  throw primaryError instanceof Error
-    ? primaryError
-    : new Error("SearXNG search failed and no hosted fallback succeeded");
+  const primaryMessage =
+    primaryError instanceof Error
+      ? primaryError.message
+      : "unknown primary error";
+  throw fallbackAttemptSummary
+    ? new Error(
+        `SearXNG search failed (${primaryMessage}); hosted fallback did not produce results (${fallbackAttemptSummary})`,
+      )
+    : primaryError instanceof Error
+      ? primaryError
+      : new Error("SearXNG search failed and no hosted fallback succeeded");
 }
 
 export async function searxSearch(

@@ -76,7 +76,7 @@ ultrasearch-mcp doctor
 ## Release status
 
 This repository starts fresh from a curated source snapshot. It does not carry the development git history of the upstream fork or private deployment repo.
-Current stage: `0.1.1`, Claude Desktop MCPB reliability release candidate.
+Current stage: `0.1.2`, first public release candidate after Claude Desktop runtime hardening.
 
 ## Persistent plan
 

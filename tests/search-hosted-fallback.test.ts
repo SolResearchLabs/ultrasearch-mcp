@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hosted = vi.hoisted(() => ({
   searchHostedFallback: vi.fn(),
+  searchHostedFallbackWithAttempts: vi.fn(),
 }));
 
 vi.mock("../src/cache.js", () => ({
@@ -36,7 +37,17 @@ vi.mock("../src/search-providers/index.js", () => ({
     count: number,
     meta: { answers: unknown[]; infoboxes: unknown[] },
   ) => count >= 1 || meta.answers.length > 0 || meta.infoboxes.length > 0,
+  describeHostedSearchAttempts: (
+    attempts: Array<{ provider: string; outcome: string; error?: string }>,
+  ) =>
+    attempts
+      .map(
+        (attempt) =>
+          `${attempt.provider}=${attempt.outcome}${attempt.error ? `: ${attempt.error}` : ""}`,
+      )
+      .join("; "),
   searchHostedFallback: hosted.searchHostedFallback,
+  searchHostedFallbackWithAttempts: hosted.searchHostedFallbackWithAttempts,
 }));
 
 const mockFetch = vi.fn();
@@ -67,9 +78,20 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockFetch.mockReset();
   hosted.searchHostedFallback.mockReset();
+  hosted.searchHostedFallbackWithAttempts.mockReset();
   delete process.env.HOSTED_SEARCH_FALLBACK_WITH_ENGINE_FILTER;
   delete process.env.HOSTED_SEARCH_FALLBACK_ENABLED;
   hosted.searchHostedFallback.mockResolvedValue(null);
+  hosted.searchHostedFallbackWithAttempts.mockImplementation(
+    async (request) => {
+      const result = await hosted.searchHostedFallback(request);
+      return {
+        result,
+        attempts: result?.attempts ?? [],
+        enabled: true,
+      };
+    },
+  );
 });
 
 describe("SearXNG hosted fallback policy", () => {
@@ -160,6 +182,25 @@ describe("SearXNG hosted fallback policy", () => {
 
     await expect(searxSearch("query", "general", 5)).rejects.toThrow(
       "searx network down",
+    );
+  });
+
+  it("reports hosted fallback attempts when primary and hosted search fail", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("searx network down"));
+    hosted.searchHostedFallbackWithAttempts.mockResolvedValueOnce({
+      result: null,
+      attempts: [
+        {
+          provider: "tinyfish",
+          outcome: "error",
+          error: "TinyFish search error: 401 Unauthorized",
+        },
+      ],
+      enabled: true,
+    });
+
+    await expect(searxSearch("query", "general", 5)).rejects.toThrow(
+      "hosted fallback did not produce results (tinyfish=error: TinyFish search error: 401 Unauthorized)",
     );
   });
 

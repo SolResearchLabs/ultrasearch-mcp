@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "ultrasearch-mcp",
   "display_name": "UltraSearch MCP",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Production-grade web research tools for Claude Desktop.",
   "long_description": "UltraSearch MCP adds search, fetch, crawl, summarization, provider provenance, and budget-aware hosted fallback to Claude Desktop. Use local SearXNG, your own hosted provider keys, or both.",
   "author": {

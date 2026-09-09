@@ -135,10 +135,30 @@ async function budgetAwareCandidates(
   return candidates;
 }
 
-export async function searchHostedFallback(
+export interface HostedSearchFallbackOutcome {
+  result: HostedSearchFallbackResult | null;
+  attempts: HostedSearchAttempt[];
+  enabled: boolean;
+}
+
+export function describeHostedSearchAttempts(
+  attempts: HostedSearchAttempt[],
+): string {
+  if (attempts.length === 0) return "no hosted providers attempted";
+  return attempts
+    .map((attempt) => {
+      const detail = attempt.error ? `: ${attempt.error}` : "";
+      return `${attempt.provider}=${attempt.outcome}${detail}`;
+    })
+    .join("; ");
+}
+
+export async function searchHostedFallbackWithAttempts(
   request: HostedSearchRequest,
-): Promise<HostedSearchFallbackResult | null> {
-  if (!hostedSearchFallbackEnabled()) return null;
+): Promise<HostedSearchFallbackOutcome> {
+  if (!hostedSearchFallbackEnabled()) {
+    return { result: null, attempts: [], enabled: false };
+  }
 
   const attempts: HostedSearchAttempt[] = [];
   const candidates = await budgetAwareCandidates(attempts);
@@ -170,10 +190,14 @@ export async function searchHostedFallback(
         budgetState: budget.state,
       });
       return {
-        results,
-        meta: EMPTY_META,
-        provider: id,
+        result: {
+          results,
+          meta: EMPTY_META,
+          provider: id,
+          attempts,
+        },
         attempts,
+        enabled: true,
       };
     } catch (err) {
       if (err instanceof HostedSearchBudgetError) {
@@ -195,7 +219,13 @@ export async function searchHostedFallback(
     }
   }
 
-  return null;
+  return { result: null, attempts, enabled: true };
+}
+
+export async function searchHostedFallback(
+  request: HostedSearchRequest,
+): Promise<HostedSearchFallbackResult | null> {
+  return (await searchHostedFallbackWithAttempts(request)).result;
 }
 
 export function configuredHostedSearchProviders(): HostedSearchProviderId[] {

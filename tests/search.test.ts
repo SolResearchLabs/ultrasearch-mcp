@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CategorySchema, TimeRangeSchema } from "../src/types.js";
 
+const hosted = vi.hoisted(() => ({
+  searchHostedFallback: vi.fn(),
+  searchHostedFallbackWithAttempts: vi.fn(),
+}));
+
 vi.mock("../src/cache.js", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn().mockResolvedValue(undefined),
@@ -15,8 +20,18 @@ vi.mock("../src/ollama.js", () => ({
 // the provenance test. hasUsefulPrimarySearch is forced false so the fallback
 // path actually runs; searchHostedFallback returns a controlled provider.
 vi.mock("../src/search-providers/index.js", () => ({
+  describeHostedSearchAttempts: (
+    attempts: Array<{ provider: string; outcome: string; error?: string }>,
+  ) =>
+    attempts
+      .map(
+        (attempt) =>
+          `${attempt.provider}=${attempt.outcome}${attempt.error ? `: ${attempt.error}` : ""}`,
+      )
+      .join("; "),
   hasUsefulPrimarySearch: vi.fn(() => false),
-  searchHostedFallback: vi.fn(),
+  searchHostedFallback: hosted.searchHostedFallback,
+  searchHostedFallbackWithAttempts: hosted.searchHostedFallbackWithAttempts,
   hostedSearchFallbackEnabled: vi.fn(() => true),
   hostedSearchFallbackMinResults: vi.fn(() => 1),
   configuredHostedSearchProviders: vi.fn(() => ["exa"]),
@@ -72,6 +87,17 @@ import { searchHostedFallback } from "../src/search-providers/index.js";
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(cacheGet).mockResolvedValue(null);
+  hosted.searchHostedFallback.mockResolvedValue(null);
+  hosted.searchHostedFallbackWithAttempts.mockImplementation(
+    async (request) => {
+      const result = await hosted.searchHostedFallback(request);
+      return {
+        result,
+        attempts: result?.attempts ?? [],
+        enabled: true,
+      };
+    },
+  );
 });
 
 afterEach(() => {

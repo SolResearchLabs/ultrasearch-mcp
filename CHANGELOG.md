@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+Reliability release candidate.
+
+- Added clear hosted-fallback diagnostics when SearXNG is down and hosted providers fail.
+- Surfaces invalid TinyFish credentials as a provider authorization error instead of a generic fetch failure.
+- Keeps the Claude Desktop startup, hoisted MCPB dependency layout, lazy tool-listing, and bounded tool-call hardening from the 0.1.1 candidate.
+
 ## 0.1.1
 
 Reliability release candidate for Claude Desktop MCPB installs.
