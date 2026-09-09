@@ -5,10 +5,16 @@ export const SEARXNG_URL = configString(
   "search.searxngUrl",
   "http://localhost:8081",
 );
-export const FIRECRAWL_URL =
-  process.env.FIRECRAWL_URL ?? "http://localhost:3002";
-export const FIRECRAWL_API_KEY =
-  process.env.FIRECRAWL_API_KEY ?? "placeholder-local";
+export const FIRECRAWL_URL = configString(
+  ["ULTRASEARCH_FIRECRAWL_URL", "FIRECRAWL_URL"],
+  "providers.firecrawl.url",
+  "http://localhost:3002",
+);
+export const FIRECRAWL_API_KEY = configString(
+  ["ULTRASEARCH_FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY"],
+  "providers.firecrawl.apiKey",
+  "placeholder-local",
+);
 export const CLOUDFLARE_ACCOUNT_ID = configString(
   ["ULTRASEARCH_CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"],
   "providers.cloudflare.accountId",

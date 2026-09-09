@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+﻿import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,8 +8,12 @@ const ENV_KEYS = [
   "ULTRASEARCH_TINYFISH_API_KEY",
   "TINYFISH_API_KEY",
   "ULTRASEARCH_PROVIDER_ORDER",
+  "ULTRASEARCH_EXA_API_KEY",
+  "ULTRASEARCH_FIRECRAWL_API_KEY",
   "TINYFISH_SECRET_FROM_ENV",
 ];
+const userConfigPlaceholder = (name: string) =>
+  ["$", "{", `user_config.${name}`, "}"].join("");
 let dir = "";
 
 beforeEach(() => {
@@ -78,5 +82,32 @@ describe("runtime config", () => {
         [],
       ),
     ).toEqual(["exa", "tinyfish"]);
+  });
+
+  it("ignores unresolved MCPB user_config placeholders", async () => {
+    process.env.ULTRASEARCH_EXA_API_KEY = userConfigPlaceholder("exa_api_key");
+    const { providerApiKey, resetRuntimeConfigForTests } = await import(
+      "../src/runtime-config.js"
+    );
+    resetRuntimeConfigForTests();
+    expect(providerApiKey("exa", ["ULTRASEARCH_EXA_API_KEY"])).toBeUndefined();
+  });
+
+  it("falls back to config when canonical env is an unresolved MCPB placeholder", async () => {
+    const configPath = join(dir, "config.json");
+    process.env.ULTRASEARCH_CONFIG = configPath;
+    process.env.ULTRASEARCH_FIRECRAWL_API_KEY =
+      userConfigPlaceholder("firecrawl_api_key");
+    writeFileSync(
+      configPath,
+      JSON.stringify({ providers: { firecrawl: { apiKey: "from-config" } } }),
+    );
+    const { providerApiKey, resetRuntimeConfigForTests } = await import(
+      "../src/runtime-config.js"
+    );
+    resetRuntimeConfigForTests();
+    expect(providerApiKey("firecrawl", ["ULTRASEARCH_FIRECRAWL_API_KEY"])).toBe(
+      "from-config",
+    );
   });
 });

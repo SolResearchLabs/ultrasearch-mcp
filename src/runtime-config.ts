@@ -49,6 +49,18 @@ function getPath(path?: string): unknown {
   }
   return current;
 }
+function isUnresolvedUserConfigPlaceholder(value: string): boolean {
+  return /^\$\{user_config\.[A-Za-z0-9_.-]+\}$/.test(value.trim());
+}
+
+function normalizeConfigString(value: string): string | undefined {
+  const expanded = expandEnv(value).trim();
+  if (expanded === "" || isUnresolvedUserConfigPlaceholder(expanded)) {
+    return undefined;
+  }
+  return expanded;
+}
+
 function expandEnv(value: string): string {
   return value.replace(
     /\$\{([A-Z0-9_]+)(?::-(.*?))?\}/g,
@@ -67,10 +79,13 @@ export function optionalConfigString(
 ): string | undefined {
   for (const name of envNames) {
     const value = process.env[name];
-    if (value !== undefined && value.trim() !== "") return value;
+    if (value !== undefined) {
+      const normalized = normalizeConfigString(value);
+      if (normalized !== undefined) return normalized;
+    }
   }
   const value = getPath(path);
-  if (typeof value === "string" && value.trim() !== "") return expandEnv(value);
+  if (typeof value === "string") return normalizeConfigString(value);
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
   if (Array.isArray(value)) return value.map(String).join(",");
@@ -91,11 +106,15 @@ export function configStringList(
 ): string[] {
   for (const name of envNames) {
     const raw = process.env[name];
-    if (raw !== undefined && raw.trim() !== "")
-      return raw
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+    if (raw !== undefined) {
+      const normalized = normalizeConfigString(raw);
+      if (normalized !== undefined) {
+        return normalized
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean);
+      }
+    }
   }
   const value = getPath(path);
   if (Array.isArray(value))
@@ -103,11 +122,15 @@ export function configStringList(
       .map(String)
       .map((x) => x.trim())
       .filter(Boolean);
-  if (typeof value === "string" && value.trim() !== "")
-    return expandEnv(value)
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
+  if (typeof value === "string") {
+    const normalized = normalizeConfigString(value);
+    if (normalized !== undefined) {
+      return normalized
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+  }
   return fallback;
 }
 

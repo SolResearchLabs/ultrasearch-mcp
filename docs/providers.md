@@ -26,3 +26,7 @@ ULTRASEARCH_TINYFISH_SEARCH_BUDGET_UNITS_PER_REQUEST=1
 ULTRASEARCH_TINYFISH_SEARCH_BUDGET_WARN_PERCENT=80
 ULTRASEARCH_HOSTED_SEARCH_BUDGET_FAIL_OPEN=false
 ```
+
+## Firecrawl
+
+Firecrawl is used by crawl/fetch fallback paths, not the hosted search-provider order. Configure it with `ULTRASEARCH_FIRECRAWL_URL` and `ULTRASEARCH_FIRECRAWL_API_KEY`, or with `providers.firecrawl.url` and `providers.firecrawl.apiKey` in the JSON config file.

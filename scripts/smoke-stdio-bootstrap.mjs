@@ -3,7 +3,18 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const entry = "build/src/index.js";
-const env = { ...process.env, ULTRASEARCH_TRANSPORT: "stdio" };
+const env = {
+  ...process.env,
+  ULTRASEARCH_TRANSPORT: "stdio",
+  ULTRASEARCH_HOSTED_FALLBACK_ENABLED: "true",
+  ULTRASEARCH_PROVIDER_ORDER: "tinyfish,exa,parallel,brave",
+  ULTRASEARCH_TINYFISH_API_KEY: "test-tinyfish-key",
+  ULTRASEARCH_EXA_API_KEY: "${user_config.exa_api_key}",
+  ULTRASEARCH_PARALLEL_API_KEY: "${user_config.parallel_api_key}",
+  ULTRASEARCH_BRAVE_API_KEY: "${user_config.brave_api_key}",
+  ULTRASEARCH_FIRECRAWL_URL: "${user_config.firecrawl_url}",
+  ULTRASEARCH_FIRECRAWL_API_KEY: "${user_config.firecrawl_api_key}",
+};
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function timedDiscover(timeoutMs) {

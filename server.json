@@ -72,6 +72,20 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "ULTRASEARCH_FIRECRAWL_URL",
+          "description": "Optional Firecrawl API URL for crawl/fetch fallback.",
+          "isRequired": false,
+          "format": "uri",
+          "isSecret": false
+        },
+        {
+          "name": "ULTRASEARCH_FIRECRAWL_API_KEY",
+          "description": "Optional Firecrawl API key. Required only when Firecrawl fallback is used.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         }
       ]
     }

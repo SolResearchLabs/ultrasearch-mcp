@@ -17,9 +17,23 @@
   "documentation": "https://github.com/SolResearchLabs/ultrasearch-mcp#readme",
   "support": "https://github.com/SolResearchLabs/ultrasearch-mcp/issues",
   "license": "MIT",
-  "keywords": ["mcp", "search", "web research", "searxng", "tinyfish", "exa", "parallel", "brave"],
+  "keywords": [
+    "mcp",
+    "search",
+    "web research",
+    "searxng",
+    "tinyfish",
+    "exa",
+    "parallel",
+    "brave",
+    "firecrawl"
+  ],
   "compatibility": {
-    "platforms": ["darwin", "win32", "linux"],
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
     "runtimes": {
       "node": ">=20.0.0"
     }
@@ -29,7 +43,9 @@
     "entry_point": "build/src/index.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/build/src/index.js"],
+      "args": [
+        "${__dirname}/build/src/index.js"
+      ],
       "env": {
         "ULTRASEARCH_TRANSPORT": "stdio",
         "ULTRASEARCH_SEARXNG_URL": "${user_config.searxng_url}",
@@ -39,7 +55,9 @@
         "ULTRASEARCH_EXA_API_KEY": "${user_config.exa_api_key}",
         "ULTRASEARCH_PARALLEL_API_KEY": "${user_config.parallel_api_key}",
         "ULTRASEARCH_BRAVE_API_KEY": "${user_config.brave_api_key}",
-        "ULTRASEARCH_TINYFISH_LOCATION": "${user_config.tinyfish_location}"
+        "ULTRASEARCH_TINYFISH_LOCATION": "${user_config.tinyfish_location}",
+        "ULTRASEARCH_FIRECRAWL_URL": "${user_config.firecrawl_url}",
+        "ULTRASEARCH_FIRECRAWL_API_KEY": "${user_config.firecrawl_api_key}"
       }
     }
   },
@@ -100,34 +118,53 @@
       "title": "TinyFish API key",
       "description": "Optional. Required only when TinyFish fallback is used.",
       "sensitive": true,
-      "required": false
+      "required": false,
+      "default": ""
     },
     "exa_api_key": {
       "type": "string",
       "title": "Exa API key",
       "description": "Optional. Required only when Exa fallback is used.",
       "sensitive": true,
-      "required": false
+      "required": false,
+      "default": ""
     },
     "parallel_api_key": {
       "type": "string",
       "title": "Parallel API key",
       "description": "Optional. Required only when Parallel fallback is used.",
       "sensitive": true,
-      "required": false
+      "required": false,
+      "default": ""
     },
     "brave_api_key": {
       "type": "string",
       "title": "Brave API key",
       "description": "Optional. Required only when Brave fallback is used.",
       "sensitive": true,
-      "required": false
+      "required": false,
+      "default": ""
     },
     "tinyfish_location": {
       "type": "string",
       "title": "TinyFish location",
       "description": "Optional two-letter location code such as US or CA.",
       "default": "US",
+      "required": false
+    },
+    "firecrawl_url": {
+      "type": "string",
+      "title": "Firecrawl URL",
+      "description": "Optional Firecrawl API URL for crawl/fetch fallback.",
+      "default": "https://api.firecrawl.dev",
+      "required": false
+    },
+    "firecrawl_api_key": {
+      "type": "string",
+      "title": "Firecrawl API key",
+      "description": "Optional. Required only when Firecrawl crawl/fetch fallback is used.",
+      "sensitive": true,
+      "default": "",
       "required": false
     }
   }

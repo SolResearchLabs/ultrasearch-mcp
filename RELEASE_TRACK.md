@@ -395,3 +395,47 @@ Next gate:
 3. Run Release workflow dry run with `create_draft_release=false` and `push_ghcr=false`.
 4. Download the CI-built MCPB artifact.
 5. Install that artifact in Claude Desktop and confirm Cowork and Code startup.
+
+## 2026-09-08 Claude MCPB placeholder and Firecrawl surface fix
+
+Real Claude Desktop retest changed the failure from version-negotiation text to plain `Connection closed`, which proves the fast bootstrap moved the failure past the first `server/discover` race but did not complete the host gate.
+
+Additional host UI findings:
+
+- Claude showed optional empty user-config substitutions as literal `${user_config...}` environment values.
+- Hosted fallback was enabled while only TinyFish had a concrete key.
+- Firecrawl existed in the code path but was missing from the MCPB and registry configuration surfaces.
+
+Fix applied:
+
+- Treat unresolved MCPB `${user_config.*}` placeholder strings as unset runtime config values.
+- Add tests proving unresolved placeholder env values do not count as provider keys.
+- Expose Firecrawl in `mcpb/manifest.json` and `server.json`.
+- Add canonical aliases `ULTRASEARCH_FIRECRAWL_URL` and `ULTRASEARCH_FIRECRAWL_API_KEY` while preserving legacy `FIRECRAWL_*` aliases.
+- Add blank defaults for optional sensitive MCPB fields so hosts have a clean empty value to substitute.
+- Expand the stdio bootstrap smoke to run with hosted fallback enabled and unresolved optional placeholder env values.
+
+Validation:
+
+- JSON parse for `package.json`, `server.json`, and `mcpb/manifest.json`: PASS.
+- Typecheck: PASS.
+- Lint: PASS.
+- Runtime config tests: PASS.
+- Full test suite: PASS, 61 files, 653 tests, no type errors.
+- Build: PASS.
+- Stdio bootstrap smoke: PASS.
+- Release metadata validate `v0.1.0`: PASS.
+- MCPB stage and manifest validate: PASS.
+- MCPB info, unpack, and unpacked manifest validate: PASS.
+- MCPB verify: expected unsigned dry-run failure only.
+- Secret scan for TinyFish-shaped keys in repo files: PASS.
+
+Local test artifact:
+
+- Path: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-firecrawl-placeholder-fix.mcpb`
+- SHA-256: `24d92720ebdd07c1daf4ab5a64d862c2672bf3eafc9098e545f7f3bac5272173`
+
+Next gate:
+
+- Install the new Firecrawl/placeholder-fix MCPB in Claude Desktop.
+- If Cowork and Code still fail with plain `Connection closed`, stop patching shims and do the full SDK v2 server migration through `@modelcontextprotocol/server` + `serveStdio`.
