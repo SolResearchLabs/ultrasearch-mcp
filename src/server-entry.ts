@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
-import { PassThrough } from "node:stream";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import { HTTP_HOST, HTTP_PORT } from "./config.js";
 import { initEvents, shutdownEvents } from "./events.js";
 import { createHttpRequestListener } from "./http-transport.js";
@@ -10,18 +9,22 @@ import { initObservability, shutdownObservability } from "./observability.js";
 import { registerTools } from "./tools.js";
 import { VERSION } from "./version.js";
 
-export type InitialStdioPayload = {
-  raw: Buffer;
-  rest: Buffer;
-};
+type LegacyToolRegistrar = Parameters<typeof registerTools>[0];
+type RawShape = Record<string, unknown>;
+type ToolCallback = (args: never) => unknown;
+type ModernRegisterTool = (
+  name: string,
+  config: RawShape,
+  cb: ToolCallback,
+) => unknown;
 
 let processHandlersInstalled = false;
+let runtimeInitialized: Promise<void> | null = null;
 
 const shutdown = async () => {
   await Promise.allSettled([shutdownObservability(), shutdownEvents()]);
   process.exit(0);
 };
-
 const installProcessHandlers = () => {
   if (processHandlersInstalled) return;
   processHandlersInstalled = true;
@@ -49,14 +52,45 @@ const installProcessHandlers = () => {
   process.once("SIGINT", shutdown);
 };
 
-const initRuntime = async () => {
+export const initRuntime = async (): Promise<void> => {
   installProcessHandlers();
-  await initObservability();
-  await initEvents();
+  runtimeInitialized ??= Promise.all([initObservability(), initEvents()]).then(
+    () => undefined,
+  );
+  await runtimeInitialized;
 };
 
-const createSearxngServer = () => {
-  const server = new McpServer({
+const adaptModernServer = (server: ModernMcpServer): LegacyToolRegistrar => {
+  const registerTool = server.registerTool.bind(
+    server,
+  ) as unknown as ModernRegisterTool;
+  const adapter = {
+    registerTool: (
+      name: string,
+      config: { inputSchema?: unknown; outputSchema?: unknown } & RawShape,
+      cb: ToolCallback,
+    ) => registerTool(name, config, cb),
+    tool: (
+      name: string,
+      description: string,
+      inputSchema: unknown,
+      cb: ToolCallback,
+    ) => registerTool(name, { description, inputSchema }, cb),
+  };
+  return adapter as unknown as LegacyToolRegistrar;
+};
+
+export const createModernMcpServer = (): ModernMcpServer => {
+  const server = new ModernMcpServer({
+    name: "ultrasearch-mcp",
+    version: VERSION,
+  });
+  registerTools(adaptModernServer(server));
+  return server;
+};
+
+const createLegacyMcpServer = (): LegacyMcpServer => {
+  const server = new LegacyMcpServer({
     name: "ultrasearch-mcp",
     version: VERSION,
   });
@@ -64,32 +98,11 @@ const createSearxngServer = () => {
   return server;
 };
 
-export const startStdioServer = async (
-  initial: InitialStdioPayload | null,
-): Promise<void> => {
-  await initRuntime();
-
-  const stdin = new PassThrough();
-  if (initial) {
-    if (initial.raw.length > 0) {
-      stdin.write(initial.raw);
-    }
-    if (initial.rest.length > 0) {
-      stdin.write(initial.rest);
-    }
-  }
-
-  process.stdin.pipe(stdin);
-  const server = createSearxngServer();
-  const transport = new StdioServerTransport(stdin, process.stdout);
-  await server.connect(transport);
-};
-
 export const startHttpServer = async (): Promise<void> => {
   await initRuntime();
 
   const httpServer = createServer(
-    createHttpRequestListener(createSearxngServer),
+    createHttpRequestListener(createLegacyMcpServer),
   );
 
   httpServer.listen(HTTP_PORT, HTTP_HOST, () => {

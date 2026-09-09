@@ -439,3 +439,30 @@ Next gate:
 
 - Install the new Firecrawl/placeholder-fix MCPB in Claude Desktop.
 - If Cowork and Code still fail with plain `Connection closed`, stop patching shims and do the full SDK v2 server migration through `@modelcontextprotocol/server` + `serveStdio`.
+
+## 2026-09-09 - SDK v2 stdio hybrid for Claude Cowork/Code
+
+Claude Desktop continued to fail Cowork/Code startup after the fast legacy-discovery shim and Firecrawl/placeholder hardening. The log changed to plain `Connection closed`, with Claude still marking the server as legacy and closing after initialize.
+
+Implemented the next release-gate fix:
+
+- Added `@modelcontextprotocol/server@2.0.0` for stdio serving.
+- Added `@modelcontextprotocol/client@2.0.0` for modern stdio smoke coverage.
+- Upgraded root `zod` to `^4.5.4` so v2 tool schemas are native.
+- Kept HTTP on the proven v1 SDK transport path for v0.1.0.
+- Added `src/stdio-entry.ts` using v2 `serveStdio`.
+- Kept `src/index.ts` as a tiny bootstrap so a claimed `server/discover` probe receives `supportedVersions: ["2026-07-28"]` inside 150 ms before heavy imports.
+- Adapted existing v1-style tool registration to v2 stdio without rewriting tool handlers.
+
+Local validation before commit:
+
+- install, typecheck, lint, tests: PASS, 61 files and 653 tests.
+- build: PASS.
+- stdio smoke: PASS for 150 ms, 300 ms, 750 ms claimed `server/discover`, v2 SDK client, and v1 SDK client.
+- npm publish dry run and npm pack dry run: PASS.
+- MCPB pack, clean, info, unpack, validate: PASS.
+- Docker build: PASS.
+- Docker MCP label: PASS.
+- tracked TinyFish-shaped secret scan, JSON parse, dash hygiene, and diff whitespace: PASS.
+
+Local test MCPB copied to Desktop: `ultrasearch-mcp-0.1.0-sdkv2-stdio-local.mcpb`, SHA-256 `0bf41a8e19fb1f4d9fb6d66b1a0d2fb3d109c84788d822d355de3f1641ba6237`.

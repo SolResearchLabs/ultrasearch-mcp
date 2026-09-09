@@ -37,6 +37,12 @@ if (
   await printCliAndExit(command);
 }
 
+const envTransport = (
+  process.env.ULTRASEARCH_TRANSPORT ??
+  process.env.SEARXNG_MCP_TRANSPORT ??
+  "stdio"
+).toLowerCase();
+
 const readInitialStdioMessage = async (): Promise<InitialStdioMessage | null> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -80,10 +86,17 @@ const readInitialStdioMessage = async (): Promise<InitialStdioMessage | null> =>
     process.stdin.resume();
   });
 
-const isServerDiscoverRequest = (line: string): { id: unknown } | null => {
+const isModernDiscoverRequest = (line: string): { id: unknown } | null => {
   try {
-    const message = JSON.parse(line) as { id?: unknown; method?: unknown };
-    return message.method === "server/discover" && "id" in message
+    const message = JSON.parse(line) as {
+      id?: unknown;
+      method?: unknown;
+      params?: { _meta?: Record<string, unknown> };
+    };
+    const meta = message.params?._meta;
+    return message.method === "server/discover" &&
+      "id" in message &&
+      meta?.["io.modelcontextprotocol/protocolVersion"] === "2026-07-28"
       ? { id: message.id }
       : null;
   } catch {
@@ -91,31 +104,38 @@ const isServerDiscoverRequest = (line: string): { id: unknown } | null => {
   }
 };
 
-const sendLegacyDiscoverResponse = (id: unknown) => {
+const sendModernDiscoverResponse = (id: unknown) => {
   process.stdout.write(
     `${JSON.stringify({
       jsonrpc: "2.0",
       id,
       result: {
-        supportedVersions: [],
-        capabilities: {},
+        supportedVersions: ["2026-07-28"],
+        capabilities: { tools: { listChanged: true } },
+        resultType: "complete",
+        ttlMs: 0,
+        cacheScope: "private",
+        _meta: {
+          "io.modelcontextprotocol/serverInfo": {
+            name: "ultrasearch-mcp",
+            version: "0.1.0",
+          },
+        },
       },
     })}\n`,
   );
 };
-
-const envTransport = (
-  process.env.ULTRASEARCH_TRANSPORT ??
-  process.env.SEARXNG_MCP_TRANSPORT ??
-  "stdio"
-).toLowerCase();
 
 if (envTransport === "http") {
   const { startHttpServer } = await import("./server-entry.js");
   await startHttpServer();
 } else {
   const initial = await readInitialStdioMessage();
-  const discover = initial ? isServerDiscoverRequest(initial.line) : null;
+  const discover = initial ? isModernDiscoverRequest(initial.line) : null;
+  if (discover) {
+    sendModernDiscoverResponse(discover.id);
+  }
+
   const initialForServer: InitialStdioPayload | null = discover
     ? initial && initial.rest.length > 0
       ? { raw: initial.rest, rest: Buffer.alloc(0) }
@@ -124,10 +144,6 @@ if (envTransport === "http") {
       ? { raw: initial.raw, rest: initial.rest }
       : null;
 
-  if (discover) {
-    sendLegacyDiscoverResponse(discover.id);
-  }
-
-  const { startStdioServer } = await import("./server-entry.js");
-  await startStdioServer(initialForServer);
+  const { startStdioServer } = await import("./stdio-entry.js");
+  startStdioServer(initialForServer);
 }
