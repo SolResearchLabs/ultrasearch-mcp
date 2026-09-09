@@ -480,3 +480,33 @@ Public validation after SDK v2 stdio hybrid commit:
 - CI-built MCPB SHA-256: `8c4420e9eaa9e84e8bad2e5adf464bd9312bbd9a4429d1e2dcb2e4fe3e410e54`.
 
 Next human gate: remove the old UltraSearch extension from Claude Desktop and install the CI-built SDK v2 stdio MCPB from Desktop. If Claude still closes Cowork/Code, inspect Claude extension logs around `03:54Z+` and do not tag v0.1.0.
+
+## Claude Desktop modern tools/list replay fix - 2026-09-09
+
+User retest of `ultrasearch-mcp-0.1.0-ci-sdkv2-stdio.mcpb` changed the failure again:
+Claude now reports `Era probe verdict: modern (sibling answered server/discover)`, then starts a session, sends `tools/list`, and closes.
+
+Root cause found by on-disk reproduction:
+the fast bootstrap answered `server/discover` itself, but did not replay that same discover request into SDK v2.
+SDK v2 therefore never initialized the real process as a modern 2026 session before Claude sent `tools/list`.
+
+Fix:
+- replay the initial modern `server/discover` line into SDK v2 `serveStdio`
+- suppress SDK v2's duplicate discover response to the client
+- keep the fast bootstrap response for Claude's tight sibling probe window
+- add a permanent `claude_modern_tools_list` smoke that sends modern discover followed by same-process modern `tools/list`
+
+Local validation:
+- typecheck, lint, tests, build: PASS
+- `server/discover` at 150/300/750 ms: PASS, `supportedVersions=["2026-07-28"]`
+- `claude_modern_tools_list`: PASS, 7 tools
+- v2 SDK stdio client: PASS, 7 tools
+- v1 SDK stdio client: PASS, 7 tools
+- npm publish dry run and npm pack dry run: PASS
+- MCPB validate, pack, clean, info, unpack validate: PASS
+- Docker build and MCP registry label: PASS
+- tracked TinyFish-shaped secret scan, JSON parse, dash hygiene, diff check: PASS
+
+Local test artifact:
+`C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-modern-replay-fix-local.mcpb`
+sha256: `193ba126e2e459de4f4f2d12f1c1b511523e43019470035bc4fa430a4d9fd69e`

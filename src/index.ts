@@ -9,6 +9,7 @@ type InitialStdioMessage = {
 type InitialStdioPayload = {
   raw: Buffer;
   rest: Buffer;
+  suppressFirstResponseId?: unknown;
 };
 
 const printCliAndExit = async (command: string) => {
@@ -137,8 +138,12 @@ if (envTransport === "http") {
   }
 
   const initialForServer: InitialStdioPayload | null = discover
-    ? initial && initial.rest.length > 0
-      ? { raw: initial.rest, rest: Buffer.alloc(0) }
+    ? initial
+      ? {
+          raw: initial.raw,
+          rest: initial.rest,
+          suppressFirstResponseId: discover.id,
+        }
       : null
     : initial
       ? { raw: initial.raw, rest: initial.rest }

@@ -1,4 +1,4 @@
-import { PassThrough } from "node:stream";
+import { PassThrough, Transform, type Writable } from "node:stream";
 import {
   type ServeStdioOptions,
   StdioServerTransport,
@@ -8,6 +8,51 @@ import {
 export type InitialStdioPayload = {
   raw: Buffer;
   rest: Buffer;
+  suppressFirstResponseId?: unknown;
+};
+
+const responseSink = (suppressFirstResponseId: unknown): Writable => {
+  if (suppressFirstResponseId === undefined) return process.stdout;
+
+  let pending = "";
+  let suppressed = false;
+
+  const sink = new Transform({
+    transform(chunk, _encoding, callback) {
+      pending += chunk.toString("utf8");
+      let newlineIndex = pending.indexOf("\n");
+
+      while (newlineIndex !== -1) {
+        const line = pending.slice(0, newlineIndex + 1);
+        pending = pending.slice(newlineIndex + 1);
+
+        if (!suppressed) {
+          suppressed = true;
+          try {
+            const parsed = JSON.parse(line.trim()) as { id?: unknown };
+            if (parsed.id === suppressFirstResponseId) {
+              newlineIndex = pending.indexOf("\n");
+              continue;
+            }
+          } catch {
+            // Forward malformed lines below.
+          }
+        }
+
+        this.push(line);
+        newlineIndex = pending.indexOf("\n");
+      }
+
+      callback();
+    },
+    flush(callback) {
+      if (pending.length > 0) this.push(pending);
+      callback();
+    },
+  });
+
+  sink.pipe(process.stdout);
+  return sink;
 };
 
 const transportOptions = (
@@ -25,7 +70,10 @@ const transportOptions = (
   process.stdin.pipe(stdin);
 
   return {
-    transport: new StdioServerTransport(stdin, process.stdout),
+    transport: new StdioServerTransport(
+      stdin,
+      responseSink(initial.suppressFirstResponseId),
+    ),
   };
 };
 

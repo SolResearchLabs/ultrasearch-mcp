@@ -6,6 +6,10 @@ import { StdioClientTransport as V1StdioClientTransport } from "@modelcontextpro
 
 const entry = "build/src/index.js";
 const placeholder = (name) => ["$", "{", `user_config.${name}`, "}"].join("");
+const envelope = {
+  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/clientCapabilities": {},
+};
 const env = {
   ...process.env,
   ULTRASEARCH_TRANSPORT: "stdio",
@@ -16,11 +20,25 @@ const env = {
   ULTRASEARCH_FIRECRAWL_API_KEY: placeholder("firecrawl_api_key"),
 };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function timedDiscover(timeoutMs) {
-  const child = spawn(process.execPath, [entry], {
+const collectJsonLines = (stdout) =>
+  stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+
+const spawnServer = () =>
+  spawn(process.execPath, [entry], {
     env,
     stdio: ["pipe", "pipe", "pipe"],
   });
+
+const writeMessage = (child, message) => {
+  child.stdin.write(`${JSON.stringify(message)}\n`);
+};
+
+async function timedDiscover(timeoutMs) {
+  const child = spawnServer();
   let stdout = "";
   let stderr = "";
   child.stdout.on("data", (chunk) => {
@@ -29,28 +47,16 @@ async function timedDiscover(timeoutMs) {
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
   });
-  child.stdin.write(
-    `${JSON.stringify({
-      jsonrpc: "2.0",
-      id: `discover-${timeoutMs}`,
-      method: "server/discover",
-      params: {
-        _meta: {
-          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-          "io.modelcontextprotocol/clientCapabilities": {},
-        },
-      },
-    })}\n`,
-  );
+  writeMessage(child, {
+    jsonrpc: "2.0",
+    id: `discover-${timeoutMs}`,
+    method: "server/discover",
+    params: { _meta: envelope },
+  });
   await sleep(timeoutMs);
   child.kill("SIGTERM");
 
-  const lines = stdout
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-  const response = lines[0];
+  const response = collectJsonLines(stdout)[0];
   if (!Array.isArray(response?.result?.supportedVersions)) {
     throw new Error(
       `server/discover did not respond within ${timeoutMs}ms; stdout=${JSON.stringify(
@@ -72,6 +78,52 @@ async function timedDiscover(timeoutMs) {
     }),
   );
 }
+
+async function claudeModernToolsListSmoke() {
+  const child = spawnServer();
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+
+  writeMessage(child, {
+    jsonrpc: "2.0",
+    id: "discover-claude",
+    method: "server/discover",
+    params: { _meta: envelope },
+  });
+  await sleep(200);
+  writeMessage(child, {
+    jsonrpc: "2.0",
+    id: 0,
+    method: "tools/list",
+    params: { _meta: envelope },
+  });
+  await sleep(1200);
+  child.kill("SIGTERM");
+
+  const lines = collectJsonLines(stdout);
+  const discover = lines.find((line) => line.id === "discover-claude");
+  const tools = lines.find((line) => line.id === 0);
+  if (!Array.isArray(discover?.result?.supportedVersions)) {
+    throw new Error(`missing discover response: ${JSON.stringify({ stdout, stderr })}`);
+  }
+  if (!Array.isArray(tools?.result?.tools) || tools.result.tools.length < 7) {
+    throw new Error(`missing tools/list response: ${JSON.stringify({ stdout, stderr })}`);
+  }
+  console.log(
+    JSON.stringify({
+      test: "claude_modern_tools_list",
+      supportedVersions: discover.result.supportedVersions,
+      toolCount: tools.result.tools.length,
+    }),
+  );
+}
+
 async function v2ClientSmoke() {
   const transport = new V2StdioClientTransport({
     command: process.execPath,
@@ -92,6 +144,7 @@ async function v2ClientSmoke() {
     JSON.stringify({ test: "v2_sdk_stdio_client", toolCount: tools.tools.length }),
   );
 }
+
 async function v1ClientSmoke() {
   const transport = new V1StdioClientTransport({
     command: process.execPath,
@@ -116,6 +169,7 @@ async function v1ClientSmoke() {
 await timedDiscover(150);
 await timedDiscover(300);
 await timedDiscover(750);
+await claudeModernToolsListSmoke();
 await v2ClientSmoke();
 await v1ClientSmoke();
 console.log("stdio_bootstrap_smoke=PASS");
