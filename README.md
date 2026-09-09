@@ -31,7 +31,7 @@ npx -y @solresearchlabs/ultrasearch-mcp doctor
 Local SearXNG only:
 
 ```bash
-ULTRASEARCH_SEARXNG_URL=http://localhost:8080 npx -y @solresearchlabs/ultrasearch-mcp
+ULTRASEARCH_SEARXNG_URL=http://127.0.0.1:8099 npx -y @solresearchlabs/ultrasearch-mcp
 ```
 
 Hosted fallback:

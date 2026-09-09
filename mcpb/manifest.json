@@ -96,7 +96,7 @@
       "type": "string",
       "title": "SearXNG URL",
       "description": "Optional local SearXNG URL. Leave as default if you do not use SearXNG.",
-      "default": "http://localhost:8080",
+      "default": "http://127.0.0.1:8099",
       "required": false
     },
     "hosted_fallback_enabled": {
