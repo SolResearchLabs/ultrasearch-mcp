@@ -311,3 +311,32 @@ Next gate:
 - Remove the old UltraSearch MCP extension from Claude Desktop.
 - Install the fixed MCPB artifact.
 - Confirm Cowork and Code sessions start without the version negotiation error.
+
+## 2026-09-08 fixed release artifact dry run
+
+Pushed compatibility fix:
+
+- Commit: `ac55781cbbb102051a9541625fd6d92a24845bd8`
+- Message: `fix: support Claude discovery probe`
+- CI run: `34294904832`, completed success
+
+Release dry run after compatibility fix:
+
+- Run: `34295037285`, completed success
+- Head SHA: `ac55781cbbb102051a9541625fd6d92a24845bd8`
+- GHCR push: skipped intentionally
+- Draft GitHub Release: skipped intentionally
+
+Fixed public artifact:
+
+- Artifact name: `ultrasearch-mcp-0.1.0-release-assets`
+- Artifact id: `10082831449`
+- Artifact digest: `sha256:904b8880ab93667899c24ff514ef457dca48fc8ed437c2e382970e10363763b2`
+- CI MCPB SHA-256: `8678098a7cf8a9b1304711261b6db75a381b34d59ca105ac1edb112f337273e3`
+- Desktop CI artifact path: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-ci-discovery-fix.mcpb`
+
+Remaining gate:
+
+- Uninstall old UltraSearch MCP extension from Claude Desktop.
+- Install the CI-built discovery fix MCPB from Desktop.
+- Confirm the Cowork and Code version negotiation error is gone.
