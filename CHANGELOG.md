@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+Reliability release candidate for Claude Desktop MCPB installs.
+
+- Replayed modern `server/discover` into the MCP v2 server while suppressing duplicate discovery output.
+- Packed MCPB production dependencies with hoisted `node_modules` so Desktop can resolve transitive MCP packages.
+- Added bounded MCP tool execution and DNS lookup deadlines so tool calls return before host bridge timeouts.
+- Lazy-loaded heavy tool handlers so `tools/list` stays fast on cold hoisted MCPB startup.
+- Added smoke coverage for modern discovery, same-process `tools/list`, and tool timeout behavior.
 ## 0.1.0
 
 Initial clean OSS release candidate.

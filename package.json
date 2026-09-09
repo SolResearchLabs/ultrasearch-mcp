@@ -1,6 +1,6 @@
 {
   "name": "@solresearchlabs/ultrasearch-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Production-grade web research MCP server with SearXNG, hosted fallback providers, fetch and crawl tools, and budget guardrails.",
   "main": "build/src/index.js",
   "bin": {

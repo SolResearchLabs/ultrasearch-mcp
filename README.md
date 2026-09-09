@@ -12,7 +12,7 @@ UltraSearch MCP gives Claude Desktop, VS Code, Cursor, Codex, and self-hosted MC
 
 Best end-user path after the first GitHub Release:
 
-1. Download `ultrasearch-mcp-v0.1.0.mcpb` from Releases.
+1. Download the latest `ultrasearch-mcp-*.mcpb` from Releases.
 2. Double-click it or drag it into Claude Desktop.
 3. Enter your own SearXNG URL or hosted provider API keys in the extension UI.
 4. Start using UltraSearch tools.
@@ -76,7 +76,7 @@ ultrasearch-mcp doctor
 ## Release status
 
 This repository starts fresh from a curated source snapshot. It does not carry the development git history of the upstream fork or private deployment repo.
-Current stage: `0.1.0`, first clean OSS release candidate.
+Current stage: `0.1.1`, Claude Desktop MCPB reliability release candidate.
 
 ## Persistent plan
 
