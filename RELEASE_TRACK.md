@@ -717,3 +717,88 @@ Release decision:
 - this performance hardening commit is post-tag on `main`
 - do not move the existing tag without explicit approval
 - next clean public release decision is either `v0.1.1` or an explicitly approved retag/draft update
+
+## 2026-09-09 - v0.1.1 release-candidate metadata and Desktop install proof
+
+Status: complete.
+
+Release boundary:
+- No npm publish.
+- No MCP Registry publish.
+- No GHCR push.
+- No public GitHub Release publish.
+- Existing v0.1.0 annotated tag remains unchanged and dereferences to ff58d8b4046d032819f77fce7c8f6463c5c8e6d9.
+
+Candidate commit:
+- c0fd13addf4822395a80db47ebf5b4f16a62618c
+- release: prepare v0.1.1 candidate
+
+Candidate metadata:
+- package.json version: 0.1.1
+- server.json version/package version: 0.1.1
+- mcpb/manifest.json version: 0.1.1
+- README release stage updated to 0.1.1
+- CHANGELOG.md 0.1.1 entry added
+- docs/release-notes/v0.1.1.md added
+
+Local validation before commit:
+- release metadata validator for v0.1.1: PASS
+- TypeScript typecheck: PASS
+- lint: PASS
+- build: PASS
+- stdio bootstrap smoke: PASS
+- stdio tool-timeout smoke: PASS
+- npm publish dry run: PASS
+- npm pack dry run: PASS
+- MCPB stage/pack/clean/info/unpack/layout: PASS
+- Docker build and MCP label: PASS
+- touched-diff secret scan: PASS
+
+Local staged MCPB timing:
+- discover: 53.6ms, tools/list: 211.3ms
+- discover: 58.5ms, tools/list: 249.1ms
+- discover: 56.1ms, tools/list: 246.9ms
+
+Public CI:
+- run: 34388635635
+- head: c0fd13addf4822395a80db47ebf5b4f16a62618c
+- conclusion: success
+
+Safe Release workflow dry run:
+- run: 34388811111
+- head: c0fd13addf4822395a80db47ebf5b4f16a62618c
+- conclusion: success
+- artifact id: 10118825268
+- artifact digest: sha256:4183dba267dda2ba8b5ea88364b7d5705081e8d39dbacd92ceccbbb8c28a8b30
+
+Verified v0.1.1 artifact checksums:
+- CHANGELOG.md: sha256:0ebf15b63476e9fe272f3ddc79b8ae2af0742466ab4926c2d6b424d0ed160a9b
+- docker-image-id.txt: sha256:5884007465dd76f265cb75f5b73a7c695c0c9d5c9d9ad28c2bd52aa969a255e6
+- docker-mcp-label.txt: sha256:d26d07a9855637a2a3f135ed2b0a429b428eae6bf86de4e71ac70ba005f0fbe3
+- mcpb-info.txt: sha256:0b0ef6ae2da396282eb8f203d210b6a43878701032c7a30fb5206735f234af59
+- one-click-release-plan.md: sha256:5437042c1e212e538da9695da40345dda943375722a9ee26e02d10794ade452c
+- server.json: sha256:cfe717c2bc9c6b8be067ea42f3e33703873946fb652f370a6c382ac467339843
+- solresearchlabs-ultrasearch-mcp-0.1.1.tgz: sha256:521a8eeefd60545b0ea89388ef099c8b3dfba29e71d91e96758f1c476fb15b48
+- ultrasearch-mcp-0.1.1.mcpb: sha256:a9b7fbe936827732ef488f4740fdec8e4901be98fd9c0bae288558f7b46eb21a
+
+CI-built MCPB installed into Claude Desktop:
+- Desktop copy: C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.1-ci-rc.mcpb
+- installed registry hash: a9b7fbe936827732ef488f4740fdec8e4901be98fd9c0bae288558f7b46eb21a
+- top-level @modelcontextprotocol/core present: PASS
+- top-level @modelcontextprotocol/server present: PASS
+- build/src/index.js present: PASS
+- build/src/tools.js present: PASS
+- build/src/tool-handlers.js present: PASS
+- manifest.json present: PASS
+- existing userConfig keys preserved: 10
+
+Claude Desktop proof after install:
+- 2026-09-09T18:30:07.087Z Initializing server
+- 2026-09-09T18:30:07.191Z Era probe verdict: modern
+- 2026-09-09T18:30:07.462Z Server started and connected successfully
+- 2026-09-09T18:30:07.495Z Message from client: method="tools/list" id=0
+- 2026-09-09T18:30:07.953Z Message from server: id=0 result
+- main.log: Connected to UltraSearch MCP (7 tools)
+
+Next gate:
+- explicit human approval for whether to create tag v0.1.1 and draft GitHub Release.
