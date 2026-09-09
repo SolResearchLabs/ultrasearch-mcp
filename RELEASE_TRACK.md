@@ -556,3 +556,38 @@ Next release gate:
 - run Release workflow dry run
 - download CI-built MCPB and confirm its bundle layout has top-level `@modelcontextprotocol/core`
 - prefer GUI install for final validation, but same-version test installs may require uninstall or cache clear because Claude Desktop keys the local extension by id and version
+
+## Public hoisted MCPB dry run and Claude Desktop install proof - 2026-09-09
+
+Commit:
+- `0976a5968680c008725b57a8a1467fc109621027`
+- message: `fix: hoist MCPB production dependencies`
+
+Public validation:
+- CI run: `34313988953`, conclusion `success`
+- Release dry run: `34314244266`, conclusion `success`
+- release artifact id: `10089501428`
+- release artifact digest: `sha256:6b86c9639583c2c28e2c49f69d32f049f77bca61d72e6c800cd74de595f5c0e1`
+- release steps completed: metadata validation, test/build, MCPB build, Docker build, checksums, artifact upload
+- GHCR push: skipped intentionally
+- draft GitHub Release: skipped intentionally
+
+CI artifact verification:
+- downloaded artifact: `ultrasearch-mcp-0.1.0-release-assets`
+- checksum verification against `SHA256SUMS.txt`: PASS for all files
+- CI MCPB: `ultrasearch-mcp-0.1.0.mcpb`
+- CI MCPB sha256: `105f3427ccfb2c35b6d760b7f5acecf1dd4aa273bdfd8aa5e93bdde9bb337007`
+- archive layout contains `node_modules/@modelcontextprotocol/core/dist/index.mjs`: PASS
+- archive layout contains `node_modules/@modelcontextprotocol/server/dist`: PASS
+- archive layout contains `build/src/index.js` and `build/src/stdio-entry.js`: PASS
+- Desktop copy: `C:\Users\Aryan\Desktop\ultrasearch-mcp-0.1.0-ci-hoisted-replay-fix.mcpb`
+
+Claude Desktop disk install proof:
+- installed extension registry hash updated to `105f3427ccfb2c35b6d760b7f5acecf1dd4aa273bdfd8aa5e93bdde9bb337007`
+- installed payload contains top-level `@modelcontextprotocol/core`: PASS
+- Claude Desktop log after CI artifact install shows `Era probe verdict: modern`, `Server started and connected successfully`, `Message from client: method="tools/list"`, and `Message from server: id=0 result`
+- no recent `Connection closed` or `Server disconnected` error lines were emitted after the CI artifact install window
+
+Release decision:
+- the Claude Desktop Cowork/Code startup blocker is resolved for the CI-built hoisted MCPB artifact
+- next gate is tag/release preparation, signing decision, npm publish approval, and MCP Registry publish approval
