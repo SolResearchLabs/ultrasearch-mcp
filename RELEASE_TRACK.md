@@ -591,3 +591,18 @@ Claude Desktop disk install proof:
 Release decision:
 - the Claude Desktop Cowork/Code startup blocker is resolved for the CI-built hoisted MCPB artifact
 - next gate is tag/release preparation, signing decision, npm publish approval, and MCP Registry publish approval
+
+## v0.1.0 signing decision - 2026-09-09
+
+Research and local testing decision: ship the v0.1.0 Claude Desktop MCPB unsigned, with SHA-256 checksums and GitHub Release provenance.
+
+Rationale:
+- The MCPB CLI supports `sign`, `verify`, `info`, and `unsign` commands, and uses PKCS#7 signing.
+- Current public MCPB/Claude Desktop issue reports show unresolved edge cases around signed bundle verification and install compatibility.
+- A self-signed MCPB would not give end users a trusted publisher chain and may add install friction without improving trust.
+- The local Windows Claude Desktop gate has already proven the unsigned hoisted MCPB loads as modern, starts, receives `tools/list`, and returns `Message from server: id=0 result`.
+
+Release rule for v0.1.0:
+- Do not sign the MCPB.
+- Publish `SHA256SUMS.txt` beside the `.mcpb`, npm tarball, `server.json`, and notes.
+- Revisit MCPB signing after a stable trusted certificate path and verifier/install behavior are proven against Claude Desktop.
