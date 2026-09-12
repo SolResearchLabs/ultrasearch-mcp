@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const CONFIG_ENV = [
@@ -18,7 +19,22 @@ const CONFIG_ENV = [
   "CLOUDFLARE_BROWSER_API_TOKEN",
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_BROWSER_TIMEOUT_MS",
+  "ULTRASEARCH_SEARXNG_URL",
+  "SEARXNG_URL",
+  "ULTRASEARCH_FIRECRAWL_URL",
+  "FIRECRAWL_URL",
+  "ULTRASEARCH_FIRECRAWL_API_KEY",
+  "FIRECRAWL_API_KEY",
+  "ULTRASEARCH_ROUTING_MODE",
+  "ROUTING_MODE",
+  "ULTRASEARCH_CONFIG",
 ];
+
+const MISSING_CONFIG_PATH = join(
+  process.cwd(),
+  "tests",
+  "__missing-control-plane-config__.json",
+);
 
 function clearConfigEnv() {
   for (const k of CONFIG_ENV) delete process.env[k];
@@ -27,6 +43,7 @@ function clearConfigEnv() {
 beforeEach(() => {
   vi.resetModules();
   clearConfigEnv();
+  process.env.ULTRASEARCH_CONFIG = MISSING_CONFIG_PATH;
 });
 
 afterEach(clearConfigEnv);
@@ -56,6 +73,32 @@ describe("CACHE_URL alias fallback chain", () => {
     process.env.REDIS_URL = "redis://redis-wins:3";
     const { CACHE_URL } = await import("../src/config.js");
     expect(CACHE_URL).toBe("redis://redis-wins:3");
+  });
+});
+
+describe("Control Plane-derived service configuration", () => {
+  it("uses the typed schema defaults for local search and Firecrawl", async () => {
+    const { FIRECRAWL_API_KEY, FIRECRAWL_URL, SEARXNG_URL } = await import(
+      "../src/config.js"
+    );
+
+    expect(SEARXNG_URL).toBe("http://127.0.0.1:8099");
+    expect(FIRECRAWL_URL).toBe("");
+    expect(FIRECRAWL_API_KEY).toBe("");
+  });
+
+  it("uses compatibility environment inputs through the Control Plane resolver", async () => {
+    process.env.ULTRASEARCH_SEARXNG_URL = "http://configured.test:8099";
+    process.env.ULTRASEARCH_FIRECRAWL_URL = "https://configured.firecrawl.test";
+    process.env.ULTRASEARCH_FIRECRAWL_API_KEY = "configured-secret";
+
+    const { FIRECRAWL_API_KEY, FIRECRAWL_URL, SEARXNG_URL } = await import(
+      "../src/config.js"
+    );
+
+    expect(SEARXNG_URL).toBe("http://configured.test:8099");
+    expect(FIRECRAWL_URL).toBe("https://configured.firecrawl.test");
+    expect(FIRECRAWL_API_KEY).toBe("configured-secret");
   });
 });
 

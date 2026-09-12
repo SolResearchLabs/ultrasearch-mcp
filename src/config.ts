@@ -1,20 +1,13 @@
+import { getControlPlaneConfig } from "./control-plane/config.js";
 import { configString } from "./runtime-config.js";
 
-export const SEARXNG_URL = configString(
-  ["ULTRASEARCH_SEARXNG_URL", "SEARXNG_URL"],
-  "search.searxngUrl",
-  "http://localhost:8081",
-);
-export const FIRECRAWL_URL = configString(
-  ["ULTRASEARCH_FIRECRAWL_URL", "FIRECRAWL_URL"],
-  "providers.firecrawl.url",
-  "http://localhost:3002",
-);
-export const FIRECRAWL_API_KEY = configString(
-  ["ULTRASEARCH_FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY"],
-  "providers.firecrawl.apiKey",
-  "placeholder-local",
-);
+const CONTROL_PLANE_CONFIG = getControlPlaneConfig();
+
+export const SEARXNG_URL = CONTROL_PLANE_CONFIG.values.localSearch.endpoint;
+export const FIRECRAWL_URL =
+  CONTROL_PLANE_CONFIG.values.remoteFetch.firecrawl.url;
+export const FIRECRAWL_API_KEY =
+  CONTROL_PLANE_CONFIG.values.remoteFetch.firecrawl.apiKey;
 export const CLOUDFLARE_ACCOUNT_ID = configString(
   ["ULTRASEARCH_CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"],
   "providers.cloudflare.accountId",
@@ -31,11 +24,7 @@ export const CLOUDFLARE_BROWSER_API_TOKEN = configString(
 );
 export const RERANKER_URL = process.env.RERANKER_URL ?? "http://localhost:8787";
 export const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-export const CACHE_URL = configString(
-  ["ULTRASEARCH_CACHE_URL", "CACHE_URL", "VALKEY_URL", "REDIS_URL"],
-  "cache.url",
-  "redis://localhost:6381",
-);
+export const CACHE_URL = CONTROL_PLANE_CONFIG.values.cache.url;
 export const CACHE_TTL_SECONDS = parseInt(
   process.env.CACHE_TTL_SECONDS ?? "3600",
   10,
@@ -68,18 +57,12 @@ export const CLOUDFLARE_BROWSER_TIMEOUT_MS = Math.min(
 // the first await in every search, so with no command timeout it hangs until the
 // MCP host's 300s idle-abort. These bound the hang; the cache stays fail-soft
 // (timeout â†’ cache miss â†’ serve live, never throw).
-export const CACHE_COMMAND_TIMEOUT_MS = positiveIntEnv(
-  "CACHE_COMMAND_TIMEOUT_MS",
-  2500,
-);
-export const CACHE_CONNECT_TIMEOUT_MS = positiveIntEnv(
-  "CACHE_CONNECT_TIMEOUT_MS",
-  3000,
-);
-export const CACHE_MAX_RETRIES_PER_REQUEST = positiveIntEnv(
-  "CACHE_MAX_RETRIES_PER_REQUEST",
-  2,
-);
+export const CACHE_COMMAND_TIMEOUT_MS =
+  CONTROL_PLANE_CONFIG.values.cache.commandTimeoutMs;
+export const CACHE_CONNECT_TIMEOUT_MS =
+  CONTROL_PLANE_CONFIG.values.cache.connectTimeoutMs;
+export const CACHE_MAX_RETRIES_PER_REQUEST =
+  CONTROL_PLANE_CONFIG.values.cache.maxRetriesPerRequest;
 
 // Bound MCP tool calls below common desktop bridge timeouts. This is a
 // defensive wall-clock deadline: individual network tiers still keep their

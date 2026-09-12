@@ -4,6 +4,11 @@ import {
   EXPAND_QUERIES_DEFAULT,
   SEARXNG_URL,
 } from "./config.js";
+import {
+  getControlPlaneConfig,
+  type ResolvedRoutingPolicy,
+  resolveRoutingPolicy,
+} from "./control-plane/index.js";
 import { normalizeHostname, recordSearchAppearance } from "./domain-db.js";
 import { applyDomainFilters } from "./domains.js";
 import { withSpan } from "./observability.js";
@@ -14,7 +19,6 @@ import {
   collectSearchEngines,
   searchRouteForCacheHit,
 } from "./research-route.js";
-import { configBoolean } from "./runtime-config.js";
 import {
   describeHostedSearchAttempts,
   hasUsefulPrimarySearch,
@@ -157,22 +161,85 @@ export async function searxSearchSingle(
   );
 }
 
-function hostedFallbackAllowed(engines?: string): boolean {
+function hostedFallbackAllowed(
+  policy: ResolvedRoutingPolicy,
+  engines?: string,
+): boolean {
   if (!engines) return true;
   // An explicit SearXNG engine constraint is a caller instruction that hosted
   // providers cannot faithfully reproduce. Preserve it unless an operator
-  // consciously opts into best-effort cross-provider fallback.
-  return configBoolean(
-    [
-      "ULTRASEARCH_HOSTED_FALLBACK_WITH_ENGINE_FILTER",
-      "HOSTED_SEARCH_FALLBACK_WITH_ENGINE_FILTER",
-    ],
-    "search.fallbackWithEngineFilter",
-    false,
+  // consciously opts into best-effort cross-provider escalation through the
+  // resolved Control Plane policy.
+  return policy.hostedSearch.withEngineFilter;
+}
+
+function mergeHybridSupplementResults(
+  localResults: SearxResult[],
+  hostedResults: SearxResult[],
+): SearxResult[] {
+  const seenUrls = new Set<string>();
+  const merged: SearxResult[] = [];
+
+  for (const result of [...localResults, ...hostedResults]) {
+    if (seenUrls.has(result.url)) continue;
+    seenUrls.add(result.url);
+    merged.push(result);
+  }
+
+  return merged;
+}
+
+function hasUsableLocalSearch(primary: SearxSearchResult): boolean {
+  return (
+    primary.results.length > 0 ||
+    primary.meta.answers.length > 0 ||
+    primary.meta.infoboxes.length > 0
   );
 }
 
-async function primarySearchWithFallback(
+function offlineSourceUnavailable(): SearxSearchResult {
+  return {
+    results: [],
+    meta: EMPTY_META,
+    diagnostic: {
+      code: "offline_source_unavailable",
+      mode: "offline_fetch_only",
+      message:
+        "Offline fetch mode has no configured offline search source for this query.",
+    },
+  };
+}
+
+async function hostedSearchPrimary(
+  query: string,
+  category: string,
+  fetchCount: number,
+  timeRange?: string,
+  language?: string,
+  site?: string | string[],
+): Promise<SearxSearchResult> {
+  const fallback = await searchHostedFallbackWithAttempts({
+    query,
+    numResults: fetchCount,
+    category,
+    timeRange,
+    language,
+    site,
+  });
+
+  if (!fallback.result) {
+    return { results: [], meta: EMPTY_META };
+  }
+
+  return {
+    results: fallback.result.results,
+    meta: fallback.result.meta,
+    route: { provider: fallback.result.provider },
+  };
+}
+
+async function localSearchWithRoutingPolicy(
+  policy: ResolvedRoutingPolicy,
   query: string,
   category: string,
   fetchCount: number,
@@ -194,7 +261,14 @@ async function primarySearchWithFallback(
       engines,
       site,
     );
-    if (hasUsefulPrimarySearch(primary.results.length, primary.meta)) {
+    if (
+      policy.hostedSearch.invocation === "never" ||
+      (policy.hostedSearch.invocation ===
+        "after_local_hard_failure_or_zero_usable_results" &&
+        hasUsableLocalSearch(primary)) ||
+      (policy.hostedSearch.invocation === "sequential_supplement_or_fallback" &&
+        hasUsefulPrimarySearch(primary.results.length, primary.meta))
+    ) {
       return primary;
     }
   } catch (err) {
@@ -203,7 +277,7 @@ async function primarySearchWithFallback(
 
   let fallbackAttemptSummary: string | undefined;
 
-  if (hostedFallbackAllowed(engines)) {
+  if (policy.hostedSearch.enabled && hostedFallbackAllowed(policy, engines)) {
     const fallback = await searchHostedFallbackWithAttempts({
       query,
       numResults: fetchCount,
@@ -216,11 +290,18 @@ async function primarySearchWithFallback(
       ? describeHostedSearchAttempts(fallback.attempts)
       : undefined;
     if (fallback.result) {
-      // Preserve useful SearXNG direct-answer metadata when a live SearXNG
-      // request succeeded but its normal result list was too sparse. The
-      // route records which hosted provider actually served.
+      // A hybrid follow-up supplements a weak local result set rather than
+      // replacing it. Local results stay first and retain their metadata; the
+      // existing route shape records the hosted escalation provider.
       return {
-        results: fallback.result.results,
+        results:
+          policy.hostedSearch.invocation ===
+            "sequential_supplement_or_fallback" && primary
+            ? mergeHybridSupplementResults(
+                primary.results,
+                fallback.result.results,
+              )
+            : fallback.result.results,
         meta: primary?.meta ?? fallback.result.meta,
         route: { provider: fallback.result.provider, fallback: true },
       };
@@ -252,12 +333,22 @@ export async function searxSearch(
   engines?: string,
   site?: string | string[],
 ): Promise<SearxSearchResult> {
-  const shouldExpand = expand ?? EXPAND_QUERIES_DEFAULT;
+  const policy = resolveRoutingPolicy(getControlPlaneConfig());
+
+  // Offline mode deliberately bypasses even the cache because its current
+  // backend may be remote Valkey. This guarantees no live network or provider
+  // call until an explicit offline search source is added.
+  if (policy.mode === "offline_fetch_only") {
+    return offlineSourceUnavailable();
+  }
+
+  const shouldExpand =
+    policy.localSearch.enabled && (expand ?? EXPAND_QUERIES_DEFAULT);
 
   // Cache key must discriminate on engines/site - same query text with a
-  // different engine set or site filter is a different search.
+  // different engine set, site filter, or routing mode is a different search.
   const siteKey = Array.isArray(site) ? site.join(",") : (site ?? "");
-  const cacheKeyInput = `${query}|engines=${engines ?? ""}|site=${siteKey}`;
+  const cacheKeyInput = `${query}|engines=${engines ?? ""}|site=${siteKey}|routingMode=${policy.mode}`;
   const key = searchCacheKey(cacheKeyInput, category, timeRange);
   const cached = await cacheGet(key);
   if (cached && !shouldExpand) {
@@ -298,7 +389,8 @@ export async function searxSearch(
       withSpan("expand_query", { "query.expand": true }, () =>
         expandQuery(query),
       ),
-      primarySearchWithFallback(
+      localSearchWithRoutingPolicy(
+        policy,
         query,
         category,
         fetchCount,
@@ -366,15 +458,25 @@ export async function searxSearch(
     };
   }
 
-  const raw = await primarySearchWithFallback(
-    query,
-    category,
-    fetchCount,
-    timeRange,
-    language,
-    engines,
-    site,
-  );
+  const raw = policy.localSearch.enabled
+    ? await localSearchWithRoutingPolicy(
+        policy,
+        query,
+        category,
+        fetchCount,
+        timeRange,
+        language,
+        engines,
+        site,
+      )
+    : await hostedSearchPrimary(
+        query,
+        category,
+        fetchCount,
+        timeRange,
+        language,
+        site,
+      );
 
   // Cache pre-filter results so domain config changes apply retroactively on cache hits.
   await cacheSet(

@@ -1,5 +1,5 @@
 import { getValkey } from "../cache.js";
-import { configBoolean, optionalConfigNumber } from "../runtime-config.js";
+import { getControlPlaneConfig } from "../control-plane/config.js";
 import type { HostedSearchProviderId } from "./types.js";
 
 export type BudgetHealthState =
@@ -36,26 +36,8 @@ export class HostedSearchBudgetError extends Error {
   }
 }
 
-function prefix(provider: HostedSearchProviderId): string {
-  return provider.toUpperCase();
-}
-
-function positiveNumber(
-  envNames: string[],
-  path: string | undefined,
-  fallback?: number,
-): number | undefined {
-  const value = optionalConfigNumber(envNames, path);
-  return value !== undefined && value > 0 ? value : fallback;
-}
-
-function boundedPercent(
-  envNames: string[],
-  path: string | undefined,
-  fallback: number,
-): number {
-  const value = positiveNumber(envNames, path, fallback) ?? fallback;
-  return Math.min(99.9, Math.max(1, value));
+function budgetConfig(provider: HostedSearchProviderId) {
+  return getControlPlaneConfig().values.hostedSearch.providers[provider].budget;
 }
 
 function periodInfo(now = new Date()): {
@@ -79,51 +61,21 @@ function periodInfo(now = new Date()): {
 }
 
 function monthlyLimit(provider: HostedSearchProviderId): number | undefined {
-  const p = prefix(provider);
-  return positiveNumber(
-    [
-      `ULTRASEARCH_${p}_SEARCH_BUDGET_MONTHLY_UNITS`,
-      `${p}_SEARCH_BUDGET_MONTHLY_UNITS`,
-    ],
-    `providers.${provider}.budget.monthlyUnits`,
-  );
+  return budgetConfig(provider).monthlyUnits;
 }
 
 function unitsPerRequest(provider: HostedSearchProviderId): number {
-  const p = prefix(provider);
-  return (
-    positiveNumber(
-      [
-        `ULTRASEARCH_${p}_SEARCH_BUDGET_UNITS_PER_REQUEST`,
-        `${p}_SEARCH_BUDGET_UNITS_PER_REQUEST`,
-      ],
-      `providers.${provider}.budget.unitsPerRequest`,
-      1,
-    ) ?? 1
-  );
+  return budgetConfig(provider).unitsPerRequest;
 }
 
 function warnPercent(provider: HostedSearchProviderId): number {
-  const p = prefix(provider);
-  return boundedPercent(
-    [
-      `ULTRASEARCH_${p}_SEARCH_BUDGET_WARN_PERCENT`,
-      `${p}_SEARCH_BUDGET_WARN_PERCENT`,
-    ],
-    `providers.${provider}.budget.warnPercent`,
-    80,
-  );
+  return budgetConfig(provider).warnPercent;
 }
 
-export function hostedBudgetFailOpen(): boolean {
-  return configBoolean(
-    [
-      "ULTRASEARCH_HOSTED_SEARCH_BUDGET_FAIL_OPEN",
-      "HOSTED_SEARCH_BUDGET_FAIL_OPEN",
-    ],
-    "budget.failOpen",
-    false,
-  );
+export function hostedBudgetFailOpen(
+  provider: HostedSearchProviderId = "exa",
+): boolean {
+  return budgetConfig(provider).failOpen;
 }
 
 function budgetKey(provider: HostedSearchProviderId, period: string): string {
@@ -197,7 +149,7 @@ export async function getHostedSearchBudgetStatus(
 ): Promise<HostedSearchBudgetStatus> {
   const { period, resetAt } = periodInfo(now);
   const limit = monthlyLimit(provider);
-  const failOpen = hostedBudgetFailOpen();
+  const failOpen = hostedBudgetFailOpen(provider);
   if (limit === undefined) {
     return classify(provider, 0, undefined, period, resetAt, failOpen);
   }
@@ -238,7 +190,7 @@ export async function reserveHostedSearchBudget(
 ): Promise<HostedSearchBudgetStatus> {
   const { period, resetAt, expireAtSeconds } = periodInfo(now);
   const limit = monthlyLimit(provider);
-  const failOpen = hostedBudgetFailOpen();
+  const failOpen = hostedBudgetFailOpen(provider);
   if (limit === undefined) {
     return classify(provider, 0, undefined, period, resetAt, failOpen);
   }

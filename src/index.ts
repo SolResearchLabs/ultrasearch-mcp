@@ -12,30 +12,23 @@ type InitialStdioPayload = {
   suppressFirstResponseId?: unknown;
 };
 
-const printCliAndExit = async (command: string) => {
-  const { printConfigTemplate, printDoctor, printHelp } = await import(
-    "./cli/configure.js"
-  );
-  if (command === "doctor") {
-    printDoctor();
-  } else if (command === "init-config" || command === "configure") {
-    printConfigTemplate();
-  } else {
-    printHelp();
-  }
+const printCliAndExit = async (argumentsForCommand: string[]) => {
+  const { runCliCommand } = await import("./cli/configure.js");
+  await runCliCommand(argumentsForCommand);
   process.exit(0);
 };
 
 const command = process.argv[2];
 if (
   command === "doctor" ||
+  command === "status" ||
   command === "init-config" ||
   command === "configure" ||
   command === "help" ||
   command === "--help" ||
   command === "-h"
 ) {
-  await printCliAndExit(command);
+  await printCliAndExit(process.argv.slice(2));
 }
 
 const envTransport = (

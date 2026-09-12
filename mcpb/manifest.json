@@ -102,7 +102,7 @@
     "hosted_fallback_enabled": {
       "type": "boolean",
       "title": "Enable hosted fallback",
-      "description": "Use your configured hosted provider keys when local search is unavailable or weak.",
+      "description": "May use your configured BYOK hosted providers when local results do not meet the configurable minimum-results threshold.",
       "default": false,
       "required": false
     },
@@ -155,14 +155,14 @@
     "firecrawl_url": {
       "type": "string",
       "title": "Firecrawl URL",
-      "description": "Optional Firecrawl API URL for crawl/fetch fallback.",
-      "default": "https://api.firecrawl.dev",
+      "description": "Optional BYOK remote Firecrawl API URL for explicit crawl/fetch escalation.",
+      "default": "",
       "required": false
     },
     "firecrawl_api_key": {
       "type": "string",
       "title": "Firecrawl API key",
-      "description": "Optional. Required only when Firecrawl crawl/fetch fallback is used.",
+      "description": "Optional. Required only for explicitly configured remote Firecrawl crawl/fetch escalation.",
       "sensitive": true,
       "default": "",
       "required": false

@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type JsonObject = Record<string, unknown>;
+export type RuntimeConfigObject = Record<string, unknown>;
+type JsonObject = RuntimeConfigObject;
 let loaded = false;
 let cachedConfig: JsonObject = {};
 
@@ -39,6 +40,14 @@ export function resetRuntimeConfigForTests(): void {
   cachedConfig = {};
 }
 
+/**
+ * Returns a JSON-only snapshot for compatibility adapters. The clone prevents
+ * callers from mutating the process-level cache while resolving diagnostics.
+ */
+export function runtimeConfigSnapshot(): RuntimeConfigObject {
+  return JSON.parse(JSON.stringify(loadConfig())) as RuntimeConfigObject;
+}
+
 function getPath(path?: string): unknown {
   if (!path) return undefined;
   let current: unknown = loadConfig();
@@ -53,7 +62,9 @@ function isUnresolvedUserConfigPlaceholder(value: string): boolean {
   return /^\$\{user_config\.[A-Za-z0-9_.-]+\}$/.test(value.trim());
 }
 
-function normalizeConfigString(value: string): string | undefined {
+export function normalizeRuntimeConfigString(
+  value: string,
+): string | undefined {
   const expanded = expandEnv(value).trim();
   if (expanded === "" || isUnresolvedUserConfigPlaceholder(expanded)) {
     return undefined;
@@ -80,12 +91,12 @@ export function optionalConfigString(
   for (const name of envNames) {
     const value = process.env[name];
     if (value !== undefined) {
-      const normalized = normalizeConfigString(value);
+      const normalized = normalizeRuntimeConfigString(value);
       if (normalized !== undefined) return normalized;
     }
   }
   const value = getPath(path);
-  if (typeof value === "string") return normalizeConfigString(value);
+  if (typeof value === "string") return normalizeRuntimeConfigString(value);
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
   if (Array.isArray(value)) return value.map(String).join(",");
@@ -107,7 +118,7 @@ export function configStringList(
   for (const name of envNames) {
     const raw = process.env[name];
     if (raw !== undefined) {
-      const normalized = normalizeConfigString(raw);
+      const normalized = normalizeRuntimeConfigString(raw);
       if (normalized !== undefined) {
         return normalized
           .split(",")
@@ -123,7 +134,7 @@ export function configStringList(
       .map((x) => x.trim())
       .filter(Boolean);
   if (typeof value === "string") {
-    const normalized = normalizeConfigString(value);
+    const normalized = normalizeRuntimeConfigString(value);
     if (normalized !== undefined) {
       return normalized
         .split(",")
@@ -157,9 +168,15 @@ export function optionalConfigBoolean(
 ): boolean | undefined {
   const raw = optionalConfigString(envNames, path);
   if (raw === undefined) return undefined;
-  const value = raw.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(value)) return true;
-  if (["0", "false", "no", "off"].includes(value)) return false;
+  return parseRuntimeConfigBoolean(raw);
+}
+
+export function parseRuntimeConfigBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const valueLower = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(valueLower)) return true;
+  if (["0", "false", "no", "off"].includes(valueLower)) return false;
   return undefined;
 }
 

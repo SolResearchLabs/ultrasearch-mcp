@@ -1,8 +1,5 @@
-import {
-  configStringList,
-  optionalConfigBoolean,
-  optionalConfigNumber,
-} from "../runtime-config.js";
+import { HOSTED_SEARCH_PROVIDER_IDS } from "../config/schema.js";
+import { getControlPlaneConfig } from "../control-plane/config.js";
 import type { SearxMeta } from "../types.js";
 import { braveSearchProvider } from "./brave.js";
 import {
@@ -36,19 +33,11 @@ const PROVIDERS: Record<HostedSearchProviderId, HostedSearchProvider> = {
   brave: braveSearchProvider,
 };
 
-const DEFAULT_ORDER: HostedSearchProviderId[] = [
-  "tinyfish",
-  "exa",
-  "parallel",
-  "brave",
-];
+const DEFAULT_ORDER: HostedSearchProviderId[] = [...HOSTED_SEARCH_PROVIDER_IDS];
 
 function providerOrder(): HostedSearchProviderId[] {
-  const configuredOrder = configStringList(
-    ["ULTRASEARCH_PROVIDER_ORDER", "HOSTED_SEARCH_PROVIDER_ORDER"],
-    "search.providerOrder",
-    DEFAULT_ORDER,
-  );
+  const configuredOrder =
+    getControlPlaneConfig().values.search.hostedFallback.providerOrder;
   const seen = new Set<HostedSearchProviderId>();
   const order: HostedSearchProviderId[] = [];
   for (const item of configuredOrder) {
@@ -61,25 +50,14 @@ function providerOrder(): HostedSearchProviderId[] {
 }
 
 export function hostedSearchFallbackEnabled(): boolean {
-  const explicit = optionalConfigBoolean(
-    ["ULTRASEARCH_HOSTED_FALLBACK_ENABLED", "HOSTED_SEARCH_FALLBACK_ENABLED"],
-    "search.hostedFallbackEnabled",
-  );
-  if (explicit !== undefined) return explicit;
+  const configured =
+    getControlPlaneConfig().values.search.hostedFallback.enabled;
+  if (configured !== "auto") return configured;
   return providerOrder().some((id) => PROVIDERS[id].configured());
 }
 
 export function hostedSearchFallbackMinResults(): number {
-  const value = optionalConfigNumber(
-    [
-      "ULTRASEARCH_HOSTED_FALLBACK_MIN_RESULTS",
-      "HOSTED_SEARCH_FALLBACK_MIN_RESULTS",
-    ],
-    "search.fallbackMinResults",
-  );
-  return value !== undefined && Number.isInteger(value) && value >= 0
-    ? value
-    : 1;
+  return getControlPlaneConfig().values.search.hostedFallback.minimumResults;
 }
 
 export function hasUsefulPrimarySearch(

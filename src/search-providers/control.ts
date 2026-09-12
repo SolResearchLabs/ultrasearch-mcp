@@ -1,17 +1,11 @@
 import { CircuitBreaker } from "../circuit-breaker.js";
 import { BoundedSemaphore, singleflight } from "../concurrency.js";
+import { getControlPlaneConfig } from "../control-plane/config.js";
 import {
   HostedSearchBudgetError,
   reserveHostedSearchBudget,
 } from "./budget.js";
 import type { HostedSearchProviderId } from "./types.js";
-
-function positiveInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const value = Number.parseInt(raw, 10);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
-}
 
 interface HostedProviderControl {
   gate: BoundedSemaphore;
@@ -19,24 +13,19 @@ interface HostedProviderControl {
 }
 
 function makeControl(id: HostedSearchProviderId): HostedProviderControl {
-  const prefix = id.toUpperCase();
+  const config =
+    getControlPlaneConfig().values.hostedSearch.providers[id].control;
   return {
     gate: new BoundedSemaphore(
       `${id}-search`,
-      positiveInt(`${prefix}_SEARCH_MAX_IN_FLIGHT`, 2),
-      positiveInt(`${prefix}_SEARCH_MAX_QUEUE`, 8),
-      positiveInt(`${prefix}_SEARCH_QUEUE_TIMEOUT_MS`, 5000),
+      config.maxInFlight,
+      config.maxQueue,
+      config.queueTimeoutMs,
     ),
     circuit: new CircuitBreaker(`${id}-search`, {
-      failureThreshold: positiveInt(
-        `${prefix}_SEARCH_CIRCUIT_FAILURE_THRESHOLD`,
-        3,
-      ),
-      cooldownMs: positiveInt(`${prefix}_SEARCH_CIRCUIT_COOLDOWN_MS`, 30_000),
-      maxCooldownMs: positiveInt(
-        `${prefix}_SEARCH_CIRCUIT_MAX_COOLDOWN_MS`,
-        300_000,
-      ),
+      failureThreshold: config.circuitFailureThreshold,
+      cooldownMs: config.circuitCooldownMs,
+      maxCooldownMs: config.circuitMaxCooldownMs,
     }),
   };
 }

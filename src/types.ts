@@ -63,10 +63,17 @@ export interface SearxMeta {
   suggestions: string[];
 }
 
+export interface SearchDiagnostic {
+  code: "offline_source_unavailable";
+  mode: "offline_fetch_only";
+  message: string;
+}
+
 export interface SearxSearchResult {
   results: SearxResult[];
   meta: SearxMeta;
   route?: SearchRoute;
+  diagnostic?: SearchDiagnostic;
 }
 
 // ── Research-route provenance ───────────────────────────────────────────────
@@ -97,7 +104,10 @@ export interface SearchRoute {
   provider: SearchProviderId;
   /** SearXNG engine names that returned results (searxng only). */
   engines?: string[];
-  /** True when a primary provider missed and a fallback served instead. */
+  /**
+   * True when hosted escalation served after local search, either as a
+   * fallback or as a sequential hybrid supplement.
+   */
   fallback?: boolean;
   /** True when served from the search cache rather than a live query. */
   cacheHit?: boolean;

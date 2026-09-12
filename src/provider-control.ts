@@ -1,62 +1,38 @@
 import { CircuitBreaker } from "./circuit-breaker.js";
 import { BoundedSemaphore, singleflight, TokenBucket } from "./concurrency.js";
+import { getControlPlaneConfig } from "./control-plane/config.js";
 import { crawl4aiHostPressure, LocalLoadShedError } from "./host-pressure.js";
-
-function positiveInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const value = Number.parseInt(raw, 10);
-  return Number.isInteger(value) && value > 0 ? value : fallback;
-}
-
-function nonNegativeInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const value = Number.parseInt(raw, 10);
-  return Number.isInteger(value) && value >= 0 ? value : fallback;
-}
-
-function positiveNumber(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const value = Number.parseFloat(raw);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
 
 function circuit(
   name: string,
-  prefix: string,
-  defaults: { failures: number; cooldownMs: number },
+  config: {
+    circuitFailureThreshold: number;
+    circuitCooldownMs: number;
+    circuitMaxCooldownMs: number;
+  },
 ): CircuitBreaker {
   return new CircuitBreaker(name, {
-    failureThreshold: positiveInt(
-      `${prefix}_CIRCUIT_FAILURE_THRESHOLD`,
-      defaults.failures,
-    ),
-    cooldownMs: positiveInt(
-      `${prefix}_CIRCUIT_COOLDOWN_MS`,
-      defaults.cooldownMs,
-    ),
-    maxCooldownMs: positiveInt(`${prefix}_CIRCUIT_MAX_COOLDOWN_MS`, 300_000),
+    failureThreshold: config.circuitFailureThreshold,
+    cooldownMs: config.circuitCooldownMs,
+    maxCooldownMs: config.circuitMaxCooldownMs,
   });
 }
 
+const providerConfig = getControlPlaneConfig().values.providerControl;
+
 const searxngGate = new BoundedSemaphore(
   "searxng",
-  positiveInt("SEARXNG_MAX_IN_FLIGHT", 6),
-  nonNegativeInt("SEARXNG_MAX_QUEUE", 24),
-  positiveInt("SEARXNG_QUEUE_TIMEOUT_MS", 5000),
+  providerConfig.searxng.maxInFlight,
+  providerConfig.searxng.maxQueue,
+  providerConfig.searxng.queueTimeoutMs,
 );
-const searxngCircuit = circuit("searxng", "SEARXNG", {
-  failures: 5,
-  cooldownMs: 30_000,
-});
+const searxngCircuit = circuit("searxng", providerConfig.searxng);
 
 const cloudflareGate = new BoundedSemaphore(
   "cloudflare-browser-run",
-  positiveInt("CLOUDFLARE_MAX_IN_FLIGHT", 12),
-  nonNegativeInt("CLOUDFLARE_MAX_QUEUE", 24),
-  positiveInt("CLOUDFLARE_QUEUE_TIMEOUT_MS", 5000),
+  providerConfig.cloudflare.maxInFlight,
+  providerConfig.cloudflare.maxQueue,
+  providerConfig.cloudflare.queueTimeoutMs,
 );
 
 // Public-safe default follows the current Workers Free Quick Actions limit:
@@ -64,26 +40,23 @@ const cloudflareGate = new BoundedSemaphore(
 // below their account ceiling (currently 10 req/s by default).
 const cloudflareRate = new TokenBucket(
   "cloudflare-browser-run-rate",
-  positiveNumber("CLOUDFLARE_QUICK_ACTION_RPS", 0.1),
-  positiveInt("CLOUDFLARE_QUICK_ACTION_BURST", 1),
-  nonNegativeInt("CLOUDFLARE_RATE_MAX_WAITERS", 24),
-  positiveInt("CLOUDFLARE_RATE_MAX_WAIT_MS", 30_000),
+  providerConfig.cloudflare.quickActionRps,
+  providerConfig.cloudflare.quickActionBurst,
+  providerConfig.cloudflare.rateMaxWaiters,
+  providerConfig.cloudflare.rateMaxWaitMs,
 );
-const cloudflareCircuit = circuit("cloudflare-browser-run", "CLOUDFLARE", {
-  failures: 5,
-  cooldownMs: 30_000,
-});
+const cloudflareCircuit = circuit(
+  "cloudflare-browser-run",
+  providerConfig.cloudflare,
+);
 
 const crawl4aiGate = new BoundedSemaphore(
   "crawl4ai",
-  positiveInt("CRAWL4AI_MAX_IN_FLIGHT", 1),
-  nonNegativeInt("CRAWL4AI_MAX_QUEUE", 8),
-  positiveInt("CRAWL4AI_QUEUE_TIMEOUT_MS", 5000),
+  providerConfig.crawl4ai.maxInFlight,
+  providerConfig.crawl4ai.maxQueue,
+  providerConfig.crawl4ai.queueTimeoutMs,
 );
-const crawl4aiCircuit = circuit("crawl4ai", "CRAWL4AI", {
-  failures: 3,
-  cooldownMs: 30_000,
-});
+const crawl4aiCircuit = circuit("crawl4ai", providerConfig.crawl4ai);
 
 export function runSearxng<T>(key: string, fn: () => Promise<T>): Promise<T> {
   return singleflight(`searxng:${key}`, async () => {
