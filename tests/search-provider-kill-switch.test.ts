@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Focused safety regression suite for the HOSTED_SEARCH_FALLBACK_ENABLED kill
 // switch (src/search-providers/index.ts). Proves that a disabled fallback:
@@ -24,6 +24,10 @@ const providers = vi.hoisted(() => ({
     search: vi.fn(),
   },
   brave: {
+    configured: vi.fn(),
+    search: vi.fn(),
+  },
+  tinyfish: {
     configured: vi.fn(),
     search: vi.fn(),
   },
@@ -104,6 +108,20 @@ vi.mock("../src/search-providers/brave.js", () => ({
   },
 }));
 
+vi.mock("../src/search-providers/tinyfish.js", () => ({
+  tinyfishSearchProvider: {
+    id: "tinyfish",
+    capabilities: {
+      semantic: false,
+      recency: true,
+      domains: true,
+      news: true,
+    },
+    configured: providers.tinyfish.configured,
+    search: providers.tinyfish.search,
+  },
+}));
+
 import { hostedSearchControlSnapshot } from "../src/search-providers/control.js";
 import {
   hostedSearchFallbackEnabled,
@@ -124,18 +142,46 @@ const result = (url: string, engine: string) => ({
   engines: [engine],
 });
 
+const TINYFISH_ENV_VARS = [
+  "TINYFISH_API_KEY",
+  "ULTRASEARCH_TINYFISH_API_KEY",
+] as const;
+
+// The suite must neither depend on nor mutate ambient TinyFish credentials:
+// they are captured and cleared for each test, then restored afterwards.
+let savedTinyfishEnv: Record<string, string | undefined> = {};
+
 beforeEach(() => {
   vi.resetAllMocks();
+  savedTinyfishEnv = {};
+  for (const key of TINYFISH_ENV_VARS) {
+    savedTinyfishEnv[key] = process.env[key];
+    delete process.env[key];
+  }
   delete process.env.HOSTED_SEARCH_PROVIDER_ORDER;
   delete process.env.HOSTED_SEARCH_FALLBACK_ENABLED;
   providers.exa.configured.mockReturnValue(true);
   providers.parallel.configured.mockReturnValue(true);
   providers.brave.configured.mockReturnValue(true);
+  providers.tinyfish.configured.mockReturnValue(false);
   providers.exa.search.mockResolvedValue([]);
   providers.parallel.search.mockResolvedValue([]);
   providers.brave.search.mockResolvedValue([]);
+  providers.tinyfish.search.mockResolvedValue([]);
   budgets.getStatus.mockResolvedValue({ state: "disabled", allowed: true });
   budgets.reserve.mockResolvedValue({ state: "disabled", allowed: true });
+});
+
+afterEach(() => {
+  for (const key of TINYFISH_ENV_VARS) {
+    const value = savedTinyfishEnv[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+  savedTinyfishEnv = {};
 });
 
 describe("HOSTED_SEARCH_FALLBACK_ENABLED kill switch", () => {
@@ -152,6 +198,7 @@ describe("HOSTED_SEARCH_FALLBACK_ENABLED kill switch", () => {
 
     expect(fallback?.provider).toBe("exa");
     expect(providers.exa.search).toHaveBeenCalledTimes(1);
+    expect(providers.tinyfish.search).not.toHaveBeenCalled();
   });
 
   it("recognizes the disabled value forms (false/0/no/off, case-insensitive)", async () => {
@@ -191,6 +238,7 @@ describe("HOSTED_SEARCH_FALLBACK_ENABLED kill switch", () => {
       expect(providers.exa.search).not.toHaveBeenCalled();
       expect(providers.parallel.search).not.toHaveBeenCalled();
       expect(providers.brave.search).not.toHaveBeenCalled();
+      expect(providers.tinyfish.search).not.toHaveBeenCalled();
     });
 
     it("consumes zero budget units (no status read, no reservation)", async () => {
