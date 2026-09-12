@@ -23,11 +23,16 @@ export const HOSTED_SEARCH_PROVIDER_IDS = [
   "brave",
 ] as const;
 
+// The current local implementation. This is intentionally separate from the
+// endpoint because localSearch.endpoint remains provider-neutral.
+export const LOCAL_SEARCH_PROVIDER_IDS = ["searxng"] as const;
+
 export const FIRECRAWL_CLASSIFICATION =
   "explicit_remote_fetch_crawl_escalation" as const;
 
 export type RoutingMode = (typeof ROUTING_MODES)[number];
 export type RuntimeMode = (typeof RUNTIME_MODES)[number];
+export type LocalSearchProviderId = (typeof LOCAL_SEARCH_PROVIDER_IDS)[number];
 export type HostedSearchProviderId =
   (typeof HOSTED_SEARCH_PROVIDER_IDS)[number];
 export type FirecrawlClassification = typeof FIRECRAWL_CLASSIFICATION;
@@ -46,6 +51,11 @@ export interface ProviderControlSettings {
   circuitCooldownMs: number;
   circuitMaxCooldownMs: number;
 }
+
+// providerControl.searxng remains the compatibility config key. Its settings
+// are the current baseline for independent local-provider control state until
+// a future provider is added to the typed configuration contract.
+export type LocalSearchProviderControlSettings = ProviderControlSettings;
 
 export interface CloudflareProviderControlSettings
   extends ProviderControlSettings {
@@ -92,7 +102,7 @@ export interface UltraSearchConfig {
     maxRetriesPerRequest: number;
   };
   providerControl: {
-    searxng: ProviderControlSettings;
+    searxng: LocalSearchProviderControlSettings;
     cloudflare: CloudflareProviderControlSettings;
     crawl4ai: ProviderControlSettings;
   };
@@ -133,6 +143,8 @@ export interface ProviderControlSources {
   circuitMaxCooldownMs: ConfigSource;
 }
 
+export type LocalSearchProviderControlSources = ProviderControlSources;
+
 export interface CloudflareProviderControlSources
   extends ProviderControlSources {
   quickActionRps: ConfigSource;
@@ -164,7 +176,7 @@ export interface EffectiveConfigSources {
   firecrawlUrl: ConfigSource;
   firecrawlApiKey: ConfigSource;
   providerControl: {
-    searxng: ProviderControlSources;
+    searxng: LocalSearchProviderControlSources;
     cloudflare: CloudflareProviderControlSources;
     crawl4ai: ProviderControlSources;
   };

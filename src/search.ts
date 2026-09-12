@@ -1,9 +1,5 @@
 import { cacheGet, cacheSet, searchCacheKey } from "./cache.js";
-import {
-  CACHE_TTL_SECONDS,
-  EXPAND_QUERIES_DEFAULT,
-  SEARXNG_URL,
-} from "./config.js";
+import { CACHE_TTL_SECONDS, EXPAND_QUERIES_DEFAULT } from "./config.js";
 import {
   getControlPlaneConfig,
   type ResolvedRoutingPolicy,
@@ -13,24 +9,31 @@ import { normalizeHostname, recordSearchAppearance } from "./domain-db.js";
 import { applyDomainFilters } from "./domains.js";
 import { withSpan } from "./observability.js";
 import { expandQuery } from "./ollama.js";
-import { runSearxng } from "./provider-control.js";
-import { ProviderHttpError, parseRetryAfterMs } from "./provider-errors.js";
-import {
-  collectSearchEngines,
-  searchRouteForCacheHit,
-} from "./research-route.js";
+import { searchRouteForCacheHit } from "./research-route.js";
 import {
   describeHostedSearchAttempts,
   hasUsefulPrimarySearch,
   searchHostedFallbackWithAttempts,
 } from "./search-providers/index.js";
+import {
+  getActiveLocalSearchProvider,
+  type LocalSearchCapabilities,
+  type LocalSearchProvider,
+  type LocalSearchRequest,
+  searchWithLocalProvider,
+} from "./search-providers/local.js";
 import type {
   SearchRoute,
   SearxMeta,
-  SearxResponse,
   SearxResult,
   SearxSearchResult,
 } from "./types.js";
+import { localSearchResultToSearxSearchResult } from "./types.js";
+
+export {
+  normalizeSearxMeta,
+  searxSearchSingle,
+} from "./search-providers/searxng.js";
 
 const EMPTY_META: SearxMeta = {
   answers: [],
@@ -54,50 +57,29 @@ function recordSearchAppearances(results: SearxResult[]): void {
   }
 }
 
-// Build a `site:` query prefix from a single domain or a list. Best-effort:
-// most engines (Google, Bing, DDG, Brave) honor the site: operator, but some
-// ignore it - documented in the tool descriptions, not guaranteed here.
-function siteFilterPrefix(site?: string | string[]): string {
-  if (!site) return "";
-  const domains = (Array.isArray(site) ? site : [site])
-    .map((d) => d.trim())
-    .filter(Boolean);
-  if (domains.length === 0) return "";
-  if (domains.length === 1) return `site:${domains[0]} `;
-  return `(${domains.map((d) => `site:${d}`).join(" OR ")}) `;
+function localSearchRequest(
+  capabilities: LocalSearchCapabilities,
+  query: string,
+  category: string,
+  fetchCount: number,
+  timeRange?: string,
+  language?: string,
+  engines?: string,
+  site?: string | string[],
+): LocalSearchRequest {
+  return {
+    query,
+    numResults: fetchCount,
+    ...(capabilities.categoryFilter ? { category } : {}),
+    ...(capabilities.timeRangeFilter && timeRange ? { timeRange } : {}),
+    ...(capabilities.languageFilter && language ? { language } : {}),
+    ...(capabilities.engineFilter && engines ? { engineFilter: engines } : {}),
+    ...(capabilities.siteFilter && site ? { siteFilter: site } : {}),
+  };
 }
 
-// Collapse SearXNG's version-varying answers/infoboxes/corrections/suggestions
-// into the normalized SearxMeta shape. Silently drops empty entries.
-export function normalizeSearxMeta(data: SearxResponse): SearxMeta {
-  const answers = (data.answers ?? [])
-    .map((a) =>
-      typeof a === "string"
-        ? { answer: a }
-        : { answer: a.answer ?? a.content ?? "", url: a.url },
-    )
-    .filter((a) => a.answer.trim().length > 0);
-
-  const infoboxes = (data.infoboxes ?? [])
-    .map((ib) => ({
-      title: ib.infobox ?? "",
-      content: ib.content ?? "",
-      url: ib.urls?.[0]?.url,
-    }))
-    .filter((ib) => ib.title.trim().length > 0 || ib.content.trim().length > 0);
-
-  const corrections = (data.corrections ?? [])
-    .map((c) => (typeof c === "string" ? c : (c.title ?? "")))
-    .filter((c) => c.trim().length > 0);
-
-  const suggestions = (data.suggestions ?? []).filter(
-    (s) => typeof s === "string" && s.trim().length > 0,
-  );
-
-  return { answers, infoboxes, corrections, suggestions };
-}
-
-export async function searxSearchSingle(
+async function executeLocalSearch(
+  provider: LocalSearchProvider,
   query: string,
   category: string,
   fetchCount: number,
@@ -106,70 +88,40 @@ export async function searxSearchSingle(
   engines?: string,
   site?: string | string[],
 ): Promise<SearxSearchResult> {
-  const controlKey = JSON.stringify([
-    query,
-    category,
-    fetchCount,
-    timeRange ?? "",
-    language ?? "",
-    engines ?? "",
-    Array.isArray(site) ? site : (site ?? ""),
-  ]);
-
-  return runSearxng(controlKey, () =>
-    withSpan(
-      "searxng_request",
-      { "search.category": category, "search.time_range": timeRange },
-      async () => {
-        const params = new URLSearchParams({
-          q: siteFilterPrefix(site) + query,
-          format: "json",
-          categories: category,
-          pageno: "1",
-        });
-        if (timeRange) params.set("time_range", timeRange);
-        if (language) params.set("language", language);
-        // Arbitrary engine selection, forwarded verbatim. Unknown/disabled engine
-        // names degrade at SearXNG (empty results), matching how `category` fails
-        // soft rather than erroring.
-        if (engines) params.set("engines", engines);
-
-        const res = await fetch(`${SEARXNG_URL}/search?${params}`, {
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) {
-          throw new ProviderHttpError(
-            "searxng",
-            res.status,
-            `SearXNG error: ${res.status} ${res.statusText}`,
-            parseRetryAfterMs(res.headers.get("Retry-After")),
-          );
-        }
-
-        const data = (await res.json()) as SearxResponse;
-        const results = data.results.slice(0, fetchCount);
-        return {
-          results,
-          meta: normalizeSearxMeta(data),
-          route: {
-            provider: "searxng",
-            engines: collectSearchEngines(results),
-          },
-        };
-      },
+  const result = await searchWithLocalProvider(
+    provider,
+    localSearchRequest(
+      provider.capabilities,
+      query,
+      category,
+      fetchCount,
+      timeRange,
+      language,
+      engines,
+      site,
     ),
   );
+  return localSearchResultToSearxSearchResult(result, {
+    provider: provider.id,
+    includeDirectAnswerMetadata: provider.capabilities.directAnswerMetadata,
+    includeKnowledgeCardMetadata: provider.capabilities.knowledgeCardMetadata,
+    includeQueryCorrectionMetadata:
+      provider.capabilities.queryCorrectionMetadata,
+    includeQuerySuggestionMetadata:
+      provider.capabilities.querySuggestionMetadata,
+    includeEngineMetadata: provider.capabilities.engineMetadata,
+  });
 }
 
 function hostedFallbackAllowed(
   policy: ResolvedRoutingPolicy,
+  capabilities: LocalSearchCapabilities,
   engines?: string,
 ): boolean {
-  if (!engines) return true;
-  // An explicit SearXNG engine constraint is a caller instruction that hosted
-  // providers cannot faithfully reproduce. Preserve it unless an operator
-  // consciously opts into best-effort cross-provider escalation through the
-  // resolved Control Plane policy.
+  // A provider that cannot apply this filter leaves no local-only constraint
+  // for hosted fallback to preserve. SearXNG declares support, keeping its
+  // established opt-in behavior byte-for-byte.
+  if (!engines || !capabilities.engineFilter) return true;
   return policy.hostedSearch.withEngineFilter;
 }
 
@@ -248,11 +200,13 @@ async function localSearchWithRoutingPolicy(
   engines?: string,
   site?: string | string[],
 ): Promise<SearxSearchResult> {
+  const provider = getActiveLocalSearchProvider();
   let primary: SearxSearchResult | null = null;
   let primaryError: unknown;
 
   try {
-    primary = await searxSearchSingle(
+    primary = await executeLocalSearch(
+      provider,
       query,
       category,
       fetchCount,
@@ -277,7 +231,10 @@ async function localSearchWithRoutingPolicy(
 
   let fallbackAttemptSummary: string | undefined;
 
-  if (policy.hostedSearch.enabled && hostedFallbackAllowed(policy, engines)) {
+  if (
+    policy.hostedSearch.enabled &&
+    hostedFallbackAllowed(policy, provider.capabilities, engines)
+  ) {
     const fallback = await searchHostedFallbackWithAttempts({
       query,
       numResults: fetchCount,
@@ -313,13 +270,16 @@ async function localSearchWithRoutingPolicy(
     primaryError instanceof Error
       ? primaryError.message
       : "unknown primary error";
+  const providerLabel = provider.displayName ?? "Local";
   throw fallbackAttemptSummary
     ? new Error(
-        `SearXNG search failed (${primaryMessage}); hosted fallback did not produce results (${fallbackAttemptSummary})`,
+        `${providerLabel} search failed (${primaryMessage}); hosted fallback did not produce results (${fallbackAttemptSummary})`,
       )
     : primaryError instanceof Error
       ? primaryError
-      : new Error("SearXNG search failed and no hosted fallback succeeded");
+      : new Error(
+          `${providerLabel} search failed and no hosted fallback succeeded`,
+        );
 }
 
 export async function searxSearch(
@@ -383,8 +343,9 @@ export async function searxSearch(
 
   if (shouldExpand) {
     // Only the original query is allowed to activate hosted fallback. Expanded
-    // variants remain SearXNG-only so one user request cannot multiply hosted
-    // search spend across query-rewrite variants.
+    // variants remain local-provider-only so one user request cannot multiply
+    // hosted search spend across query-rewrite variants.
+    const expandedProvider = getActiveLocalSearchProvider();
     const [variants, original] = await Promise.all([
       withSpan("expand_query", { "query.expand": true }, () =>
         expandQuery(query),
@@ -403,7 +364,8 @@ export async function searxSearch(
 
     const variantResults = await Promise.allSettled(
       variants.map((v) =>
-        searxSearchSingle(
+        executeLocalSearch(
+          expandedProvider,
           v,
           category,
           fetchCount,

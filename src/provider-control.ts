@@ -20,13 +20,38 @@ function circuit(
 
 const providerConfig = getControlPlaneConfig().values.providerControl;
 
-const searxngGate = new BoundedSemaphore(
-  "searxng",
-  providerConfig.searxng.maxInFlight,
-  providerConfig.searxng.maxQueue,
-  providerConfig.searxng.queueTimeoutMs,
-);
-const searxngCircuit = circuit("searxng", providerConfig.searxng);
+interface LocalSearchProviderControl {
+  gate: BoundedSemaphore;
+  circuit: CircuitBreaker;
+}
+
+const localSearchProviderControls = new Map<
+  string,
+  LocalSearchProviderControl
+>();
+
+function localSearchProviderControl(
+  provider: string,
+): LocalSearchProviderControl {
+  const existing = localSearchProviderControls.get(provider);
+  if (existing) return existing;
+
+  // Keep providerControl.searxng as the current compatibility configuration
+  // source. Newly registered providers receive independent gate/circuit state
+  // from that baseline until a future slice adds provider-specific settings.
+  const config = providerConfig.searxng;
+  const control = {
+    gate: new BoundedSemaphore(
+      provider,
+      config.maxInFlight,
+      config.maxQueue,
+      config.queueTimeoutMs,
+    ),
+    circuit: circuit(provider, config),
+  };
+  localSearchProviderControls.set(provider, control);
+  return control;
+}
 
 const cloudflareGate = new BoundedSemaphore(
   "cloudflare-browser-run",
@@ -58,13 +83,33 @@ const crawl4aiGate = new BoundedSemaphore(
 );
 const crawl4aiCircuit = circuit("crawl4ai", providerConfig.crawl4ai);
 
-export function runSearxng<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  return singleflight(`searxng:${key}`, async () => {
+export function runLocalSearchProvider<T>(
+  provider: string,
+  key: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const control = localSearchProviderControl(provider);
+  return singleflight(`${provider}:${key}`, async () => {
     // Do not consume a finite provider queue slot when the circuit is known to
     // be open. execute() checks again after admission to handle races.
-    searxngCircuit.assertAvailable();
-    return searxngGate.run(() => searxngCircuit.execute(fn));
+    control.circuit.assertAvailable();
+    return control.gate.run(() => control.circuit.execute(fn));
   });
+}
+
+// Compatibility export for the existing SearXNG adapter and callers. The
+// generic local-provider control path above retains the former key, queue, and
+// circuit behavior for this provider.
+export function runSearxng<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  return runLocalSearchProvider("searxng", key, fn);
+}
+
+export function localSearchProviderControlSnapshot(provider: string) {
+  const control = localSearchProviderControl(provider);
+  return {
+    ...control.gate.snapshot(),
+    circuit: control.circuit.snapshot(),
+  };
 }
 
 export function runCloudflareQuickAction<T>(
@@ -112,10 +157,11 @@ export function runCrawl4ai<T>(key: string, fn: () => Promise<T>): Promise<T> {
 }
 
 export function providerControlSnapshot() {
+  const searxngControl = localSearchProviderControl("searxng");
   return {
     searxng: {
-      ...searxngGate.snapshot(),
-      circuit: searxngCircuit.snapshot(),
+      ...searxngControl.gate.snapshot(),
+      circuit: searxngControl.circuit.snapshot(),
     },
     cloudflare: {
       ...cloudflareGate.snapshot(),

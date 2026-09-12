@@ -5,6 +5,7 @@
 // Surfaced to users as a concise "Research route:" line and in
 // structuredContent for badge rendering.
 
+import { LOCAL_SEARCH_PROVIDER_IDS } from "./config/schema.js";
 import type {
   FetchProviderId,
   FetchRoute,
@@ -38,7 +39,7 @@ function routeBaseLabel(provider: string): string {
 }
 
 const KNOWN_SEARCH_PROVIDERS: readonly SearchProviderId[] = [
-  "searxng",
+  ...LOCAL_SEARCH_PROVIDER_IDS,
   "exa",
   "parallel",
   "tinyfish",

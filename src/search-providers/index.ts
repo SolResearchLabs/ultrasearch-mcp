@@ -226,6 +226,25 @@ export async function hostedSearchBudgetSnapshot(): Promise<
 
 export { hostedSearchControlSnapshot } from "./control.js";
 export type {
+  LocalSearchCapabilities,
+  LocalSearchDirectAnswer,
+  LocalSearchItem,
+  LocalSearchKnowledgeCard,
+  LocalSearchMetadata,
+  LocalSearchProvider,
+  LocalSearchRequest,
+  LocalSearchResult,
+} from "./local.js";
+export {
+  getActiveLocalSearchProvider,
+  localSearchProvider,
+  registerLocalSearchProvider,
+  searchLocalProvider,
+  searchWithLocalProvider,
+  setActiveLocalSearchProvider,
+} from "./local.js";
+export { searxngSearchProvider } from "./searxng.js";
+export type {
   HostedSearchCapabilities,
   HostedSearchProvider,
   HostedSearchProviderId,

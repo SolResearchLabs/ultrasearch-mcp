@@ -24,6 +24,17 @@ SearXNG is the first `LocalSearchProvider`. It is an interchangeable local
 provider, not the product identity. The canonical first local endpoint is
 `http://127.0.0.1:8099`.
 
+Core reaches local search through `src/search-providers/local.ts`. That
+boundary owns provider-neutral search items, metadata cards, request filters,
+and capability declarations; the current registry binds it to the SearXNG
+adapter in `src/search-providers/searxng.ts`. Core forwards a filter and
+surfaces engine metadata only when the active provider declares support for
+them. The SearXNG adapter translates its native request and response into the
+neutral contract, while the Core compatibility edge retains the established
+SearXNG result and route shapes. The current configuration keeps the
+provider-neutral `localSearch.endpoint` contract, while the established SearXNG
+environment and JSON compatibility inputs continue to resolve that endpoint.
+
 Hosted search providers are explicit user-supplied, bring-your-own-key backup
 providers. They are subject to routing mode, budget decisions, and route
 disclosure. They do not define UltraSearch's default identity.

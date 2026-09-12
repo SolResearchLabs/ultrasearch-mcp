@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LocalSearchProviderId } from "./config/schema.js";
 
 export interface DomainProfile {
   boost?: string[];
@@ -63,12 +64,52 @@ export interface SearxMeta {
   suggestions: string[];
 }
 
+/**
+ * Provider-neutral item returned from a local-search implementation. The
+ * legacy SearXNG result vocabulary remains below for compatibility at the
+ * public Core boundary.
+ */
+export interface LocalSearchItem {
+  title: string;
+  url: string;
+  snippet?: string;
+  source?: string;
+  sources?: string[];
+  publishedAt?: string;
+}
+
+export interface LocalSearchDirectAnswer {
+  text: string;
+  url?: string;
+}
+
+export interface LocalSearchKnowledgeCard {
+  title?: string;
+  text: string;
+  url?: string;
+}
+
+export interface LocalSearchMetadata {
+  directAnswers?: LocalSearchDirectAnswer[];
+  knowledgeCards?: LocalSearchKnowledgeCard[];
+  queryCorrections?: string[];
+  querySuggestions?: string[];
+  engineNames?: string[];
+}
+
 export interface SearchDiagnostic {
   code: "offline_source_unavailable";
   mode: "offline_fetch_only";
   message: string;
 }
 
+export interface LocalSearchResult {
+  items: LocalSearchItem[];
+  metadata?: LocalSearchMetadata;
+  diagnostic?: SearchDiagnostic;
+}
+
+// Existing SearXNG-shaped consumers keep this public compatibility contract.
 export interface SearxSearchResult {
   results: SearxResult[];
   meta: SearxMeta;
@@ -81,12 +122,16 @@ export interface SearxSearchResult {
 // concise "Research route:" line and in structuredContent for badge rendering.
 // Built only from explicit runtime state, never inferred from logs.
 export type SearchProviderId =
-  | "searxng"
+  | LocalSearchProviderId
   | "exa"
   | "parallel"
   | "tinyfish"
   | "brave"
   | "cache";
+// A registered local provider can participate in Core before it is added to
+// the configured public vocabulary. Known providers remain validated at the
+// cache/protocol boundaries.
+export type SearchRouteProviderId = SearchProviderId | (string & {});
 export type FetchProviderId =
   | "cloudflare"
   | "crawl4ai"
@@ -101,8 +146,8 @@ export type FetchProviderId =
   | "cache";
 
 export interface SearchRoute {
-  provider: SearchProviderId;
-  /** SearXNG engine names that returned results (searxng only). */
+  provider: SearchRouteProviderId;
+  /** Engine names reported by a local provider when available. */
   engines?: string[];
   /**
    * True when hosted escalation served after local search, either as a
@@ -111,6 +156,72 @@ export interface SearchRoute {
   fallback?: boolean;
   /** True when served from the search cache rather than a live query. */
   cacheHit?: boolean;
+}
+
+export function localSearchMetadataToSearxMeta(
+  metadata: LocalSearchMetadata | undefined,
+): SearxMeta {
+  return {
+    answers: (metadata?.directAnswers ?? []).map((answer) => ({
+      answer: answer.text,
+      ...(answer.url === undefined ? {} : { url: answer.url }),
+    })),
+    infoboxes: (metadata?.knowledgeCards ?? []).map((card) => ({
+      title: card.title ?? "",
+      content: card.text,
+      ...(card.url === undefined ? {} : { url: card.url }),
+    })),
+    corrections: metadata?.queryCorrections ?? [],
+    suggestions: metadata?.querySuggestions ?? [],
+  };
+}
+
+export function localSearchResultToSearxSearchResult(
+  result: LocalSearchResult,
+  options: {
+    provider: SearchRouteProviderId;
+    includeDirectAnswerMetadata: boolean;
+    includeKnowledgeCardMetadata: boolean;
+    includeQueryCorrectionMetadata: boolean;
+    includeQuerySuggestionMetadata: boolean;
+    includeEngineMetadata: boolean;
+  },
+): SearxSearchResult {
+  const metadata = result.metadata;
+  const legacyMeta = localSearchMetadataToSearxMeta(metadata);
+  return {
+    results: result.items.map((item) => ({
+      title: item.title,
+      url: item.url,
+      ...(item.snippet === undefined ? {} : { content: item.snippet }),
+      ...(item.source === undefined ? {} : { engine: item.source }),
+      ...(item.sources === undefined ? {} : { engines: item.sources }),
+      ...(item.publishedAt === undefined
+        ? {}
+        : { publishedDate: item.publishedAt }),
+    })),
+    meta: {
+      answers: options.includeDirectAnswerMetadata ? legacyMeta.answers : [],
+      infoboxes: options.includeKnowledgeCardMetadata
+        ? legacyMeta.infoboxes
+        : [],
+      corrections: options.includeQueryCorrectionMetadata
+        ? legacyMeta.corrections
+        : [],
+      suggestions: options.includeQuerySuggestionMetadata
+        ? legacyMeta.suggestions
+        : [],
+    },
+    route: options.includeEngineMetadata
+      ? {
+          provider: options.provider,
+          engines: result.metadata?.engineNames ?? [],
+        }
+      : { provider: options.provider },
+    ...(result.diagnostic === undefined
+      ? {}
+      : { diagnostic: result.diagnostic }),
+  };
 }
 
 export interface FetchRoute {
