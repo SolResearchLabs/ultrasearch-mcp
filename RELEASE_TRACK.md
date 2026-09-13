@@ -826,3 +826,12 @@ Next gate:
 - Search diagnostic with current local stored credentials: SearXNG search failed (fetch failed); hosted fallback did not produce results (exa=unconfigured; parallel=unconfigured; brave=unconfigured; tinyfish=error: TinyFish search error: 401 Unauthorized).
 - New user-provided TinyFish and Firecrawl keys were not written by automation because the tool safety wrapper blocked raw credential transmission. They must be entered through Claude Desktop's extension settings UI, then retested.
 - Release remains draft/unpublished. No npm publish, no MCP Registry publish, no GHCR push, no public GitHub Release publish.
+
+## v0.2.0 version truth checkpoint - 2026-09-13
+
+- Owner approved version `0.2.0` as the next minor release; recorded as the Owner decision `D-042` in `DECISIONS.md` (2026-09-13), satisfying the FP-008 Q1 gate.
+- T1 metadata/CHANGELOG/release-notes landing: `package.json`, `server.json`, and `mcpb/manifest.json` version fields moved `0.1.2` -> `0.2.0`; `CHANGELOG.md` gained the `0.2.0` section; `docs/release-notes/v0.2.0.md` added.
+- The 0.2.0 story covers only implemented, accepted behavior from `FULL-PACKAGE-002` through `FULL-PACKAGE-007`: the shared Control Plane foundation (typed effective config, profiles, policy, status, doctor, five routing modes with `local_first` default and `hybrid` retained), the provider-neutral local search boundary, the Windows provisioning patch and provisioning helper (external artifact, provision-time verification), the Control Plane managed local runtime lifecycle (provision/start/stop/restart/reconcile/repair/cleanup on loopback `127.0.0.1:18099`), the hermeticity test repair, the aggressive runtime/route/platform test matrices, and the release-trigger guard with truthful release claims (FP-008 T1a/T2/T3/T5).
+- G12 boundary note: standing constraints remain in force - no push, no tag, no publish, no release, no deploy, no cloud action, no credential use. The release workflow is manual-only and Owner-only. This file is a historical checkpoint, not an instruction to push; the earlier "Next agent start here" step that instructed a push after green validation is superseded by this note and must not be followed.
+- Open items: Tauri Desktop remains deferred; the G10 one-click managed runtime (acquisition plus interpreter automation) remains a product gap for a future slice; publication and tagging remain pending explicit Owner action.
+- No npm publish, no MCP Registry publish, no GHCR push, no tag, and no public GitHub Release occurred with this checkpoint.

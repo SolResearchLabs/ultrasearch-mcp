@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+Feature release: shared Control Plane foundation, provider-neutral local search, and a managed local runtime lifecycle.
+
+- Added the shared Control Plane foundation: typed effective configuration, profiles, policy, and `status`/`doctor` diagnostics, with five routing modes and `local_first` as the default.
+- Added the provider-neutral local search boundary, currently bound to the SearXNG adapter.
+- Added the Windows provisioning patch and provisioning helper. The patch is an external artifact and is verified at provision time before it is applied.
+- Added the Control Plane managed local runtime lifecycle through `ultrasearch-mcp runtime`: provision, start, stop, restart, status, repair, and cleanup for a runtime bound to loopback `127.0.0.1:18099`.
+- Repaired the hermeticity test so the suite is insensitive to ambient credential variables.
+- Added aggressive runtime, route, and platform test matrices.
+- Hardened the release path: the release workflow is manual-dispatch only, and release-facing claims are guarded against implemented behavior.
+
 ## 0.1.2
 
 Reliability release candidate.

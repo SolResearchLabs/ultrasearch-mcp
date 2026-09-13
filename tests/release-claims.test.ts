@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 // packet gap it guards:
 //   - G3  install-path docs describe artifacts that are not published yet;
 //   - G4  live release automation was tag-triggered (T1a removes the trigger);
-//   - G8  MCPB platform claims are broader than the Windows-first managed
-//         runtime scope;
+//   - G8  MCPB platform claims vs the Windows-first managed runtime scope
+//         (closed by the required scope sentence in docs/release-notes/v0.2.0.md);
 //   - G11/G12 release-boundary statements and the canonical endpoint must not
 //         be lost by the T2/T3 wording pass.
 //
@@ -247,28 +247,39 @@ describe("FULL-PACKAGE-008 release claims", () => {
     );
   });
 
-  // FINDING (Q7, G8): the required MCPB-vs-managed-runtime scope sentence is
-  // not present in README/docs today. The manifest claims darwin/win32/linux
-  // for the MCPB, while README.md:128, docs/control-plane.md:96, and
-  // docs/local-runtime.md:86 scope only the *managed runtime* to Windows. Q7
-  // rules that the scope be documented, not that the manifest change, and the
-  // T2/T3 wording pass did not land the sentence. This test documents the gap
-  // instead of failing the suite; when it flips (any sentence containing both
-  // "MCPB" and "Windows" in a scope surface), promote that sentence into the
-  // hard check above.
-  it("FINDING: records the missing MCPB-vs-managed-runtime scope sentence (Q7)", () => {
-    const scoped = [
-      "README.md",
-      "docs/local-runtime.md",
-      "docs/security-model.md",
-    ].filter((surface) => {
-      const sentences = readRepositoryFile(surface)
-        .replace(/\s+/g, " ")
-        .split(/(?<=\.)\s+/);
-      return sentences.some(
-        (sentence) => /mcpb/i.test(sentence) && /windows/i.test(sentence),
-      );
-    });
-    expect(scoped).toEqual([]);
+  // Promoted FINDING (Q7, G8): the scope sentence landed in the T1 release
+  // notes (docs/release-notes/v0.2.0.md), so the former self-clearing FINDING
+  // is now a hard check. The MCPB manifest keeps its recorded
+  // darwin/win32/linux claims for the MCP server itself, while the managed
+  // local runtime is Windows-first.
+  it("requires the MCPB-vs-managed-runtime scope sentence in the 0.2.0 release notes (Q7, G8)", () => {
+    const notes = readRepositoryFile("docs/release-notes/v0.2.0.md").replace(
+      /\s+/g,
+      " ",
+    );
+    const scopeSentence = notes
+      .split(/(?<=\.)\s+/)
+      .find((sentence) => /mcpb/i.test(sentence) && /windows/i.test(sentence));
+    expect(
+      scopeSentence,
+      "docs/release-notes/v0.2.0.md must scope the MCPB platforms against the Windows-first managed runtime",
+    ).toBeDefined();
+    // The refusal code and the claimed platforms are part of the scope
+    // statement, so the sentence cannot be reduced to a vague promise.
+    expect(notes).toContain("unsupported_platform");
+    for (const platform of ["darwin", "win32", "linux"]) {
+      expect(notes).toContain(platform);
+    }
+
+    // Q7 rules that the manifest is left unchanged; the claims are re-asserted
+    // here so any silent widening or narrowing fails the suite.
+    const manifest = JSON.parse(readRepositoryFile("mcpb/manifest.json")) as {
+      compatibility: { platforms: string[] };
+    };
+    expect(manifest.compatibility.platforms).toEqual([
+      "darwin",
+      "win32",
+      "linux",
+    ]);
   });
 });
