@@ -28,19 +28,21 @@ Control Plane, MCP, CLI, Desktop, and the local runtime:
 
 ### Claude Desktop
 
-Best end-user path after the first GitHub Release:
+Best end-user path once the first public GitHub Release is published:
 
 1. Download the latest `ultrasearch-mcp-*.mcpb` from Releases.
 2. Double-click it or drag it into Claude Desktop.
 3. Enter your own SearXNG URL or optional hosted provider API keys in the extension UI.
 4. Start using UltraSearch tools.
 
-Until the release artifact exists, use the raw Claude config in `examples/claude-desktop.json`.
+Until that release is published, use the raw Claude config in `examples/claude-desktop.json`.
 ### VS Code, Cursor, and Copilot
 
-Use the prompt-based config in `examples/vscode-mcp.json`. It uses host input variables so API keys are not hardcoded into the file.
+Use the prompt-based config in `examples/vscode-mcp.json`. It uses host input variables so API keys are not hardcoded into the file. It launches the server through `npx`, so it depends on the npm package being published.
 
 ### npm
+
+Release target: available once `@solresearchlabs/ultrasearch-mcp` is published to npm.
 
 ```bash
 npx -y @solresearchlabs/ultrasearch-mcp doctor

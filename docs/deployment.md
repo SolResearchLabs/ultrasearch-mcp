@@ -2,6 +2,8 @@
 
 ## Local package
 
+Release target: available once `@solresearchlabs/ultrasearch-mcp` is published to npm. The commands below are the intended install steps after publication.
+
 ```bash
 npm install -g @solresearchlabs/ultrasearch-mcp
 ultrasearch-mcp doctor

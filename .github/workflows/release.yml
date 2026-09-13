@@ -1,9 +1,8 @@
+# Guard: pushing a "v*" tag or dispatching this workflow is an Owner-only release
+# action; it is not authorized for FP-008. Do not push tags or run it.
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       release_tag:

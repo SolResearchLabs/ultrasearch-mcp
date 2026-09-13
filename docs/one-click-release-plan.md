@@ -2,6 +2,8 @@
 
 This is the persistent product plan for turning UltraSearch MCP from a good OSS source repo into a polished MCP package.
 
+> **Status (2026-09-12): target state, not current truth.** This plan names artifacts that do not exist yet: no published npm package, no OCI image at `ghcr.io/solresearchlabs/ultrasearch-mcp`, and no MCP Registry `oci` entry. Treat every install and release step below as planned until those artifacts exist.
+
 ## Goal
 
 A user should not need to understand the repo to use UltraSearch MCP.

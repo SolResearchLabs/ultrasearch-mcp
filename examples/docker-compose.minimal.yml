@@ -1,3 +1,8 @@
+# WARNING: This example runs the unauthenticated HTTP transport. The container
+# listens on 0.0.0.0 inside Docker's network; the port below is published on the
+# host loopback address only. Do not expose it on a public or non-loopback host
+# address without network controls or an auth gateway.
+# See docs/security-model.md:58-59 and docs/transports.md:22.
 services:
   ultrasearch-mcp:
     build:
@@ -11,4 +16,4 @@ services:
       ULTRASEARCH_HTTP_HOST: 0.0.0.0
       ULTRASEARCH_HTTP_PORT: 3001
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
