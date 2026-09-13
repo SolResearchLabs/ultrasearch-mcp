@@ -55,6 +55,13 @@ const PUBLICATION_MARKERS: ReadonlySet<string> = new Set<string>();
 // command at npx (the three example configs the packet lists in section 4.3).
 const NPX_LAUNCH_PATTERN = /"command"\s*:\s*"npx"|command\s*=\s*"npx"/;
 
+// In-file scoping literal (DQ-046 R1 as corrected): a machine-readable example
+// scopes itself by carrying this exact comment line immediately above its npx
+// launcher. Used by the coverage test below and asserted directly for
+// examples/codex.toml.
+const EXAMPLE_RELEASE_TARGET_MARKER =
+  "# Release-target: available once the package is published to npm";
+
 // Prose install surfaces present npx or global-install commands directly.
 const INSTALL_COMMAND_PATTERN = /npx\s+-y|npm install -g/;
 
@@ -111,27 +118,32 @@ describe("FULL-PACKAGE-008 release claims", () => {
 
     const uncovered = npxExamples.filter(
       (path) =>
-        !PUBLICATION_MARKERS.has(path) && scopingSentenceFor(path) === null,
+        !PUBLICATION_MARKERS.has(path) &&
+        scopingSentenceFor(path) === null &&
+        !readRepositoryFile(path)
+          .split(/\r?\n/)
+          .includes(EXAMPLE_RELEASE_TARGET_MARKER),
     );
-    // Known G3 residual: examples/codex.toml launches through npx, no granted
-    // T2 surface names it, and the T2 allowance does not include examples/**.
-    // Recorded exactly so coverage cannot silently regress further; it clears
-    // (and this expectation must be updated) once the file is scoped or a
-    // publication marker lands. See the FINDING test below.
-    expect(uncovered).toEqual(["examples/codex.toml"]);
+    // The G3 residual closed in FP-008/DQ-046: examples/codex.toml carries the
+    // exact in-file release-target comment above its npx launcher (asserted
+    // directly by codex-npx-release-target-scoped below), so no
+    // machine-readable example remains uncovered.
+    expect(uncovered).toEqual([]);
   });
 
-  // FINDING (G3): documents rather than fails. examples/codex.toml remains an
-  // unscoped npx surface because the grant stops at README.md and
-  // docs/deployment.md. When this test fails, the gap closed: delete this test
-  // and the residual entry in the test above, then move the file into the hard
-  // coverage expectation.
-  it("FINDING: examples/codex.toml remains an unscoped npx surface pending the G3 wording pass", () => {
-    expect(
-      NPX_LAUNCH_PATTERN.test(readRepositoryFile("examples/codex.toml")),
-    ).toBe(true);
-    expect(scopingSentenceFor("examples/codex.toml")).toBeNull();
-    expect(PUBLICATION_MARKERS.has("examples/codex.toml")).toBe(false);
+  it("codex-npx-release-target-scoped", () => {
+    // DQ-046 R1 as corrected: the codex example scopes its own npx launcher
+    // with the exact comment line immediately above `command = "npx"`.
+    const lines = readRepositoryFile("examples/codex.toml").split(/\r?\n/);
+    const markerIndex = lines.indexOf(EXAMPLE_RELEASE_TARGET_MARKER);
+    expect(markerIndex).toBeGreaterThanOrEqual(0);
+    const afterMarker = lines
+      .slice(markerIndex + 1)
+      .filter((line) => line.trim().length > 0);
+    expect(afterMarker[0]?.trim()).toBe('command = "npx"');
+    expect(afterMarker[1]?.trim()).toBe(
+      'args = ["-y", "@solresearchlabs/ultrasearch-mcp"]',
+    );
   });
 
   it("retains the canonical local-search endpoint on the release surfaces (G11)", () => {
