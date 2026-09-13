@@ -22,6 +22,7 @@ const command = process.argv[2];
 if (
   command === "doctor" ||
   command === "status" ||
+  command === "runtime" ||
   command === "init-config" ||
   command === "configure" ||
   command === "help" ||

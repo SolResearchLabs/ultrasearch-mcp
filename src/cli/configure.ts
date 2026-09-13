@@ -2,8 +2,10 @@ import {
   type ControlPlaneStatus,
   getControlPlaneConfig,
   getControlPlaneStatus,
+  type ManagedRuntimeStatus,
 } from "../control-plane/index.js";
 import { ultrasearchConfigPath } from "../runtime-config.js";
+import { runRuntimeCommand } from "./runtime.js";
 
 type DiagnosticCommand = "doctor" | "status";
 type DiagnosticOutputFormat = "human" | "json";
@@ -16,6 +18,7 @@ Usage:
   ultrasearch-mcp                 Start the MCP server
   ultrasearch-mcp doctor [--json] Print redacted local configuration status
   ultrasearch-mcp status [--json] Print redacted Control Plane status
+  ultrasearch-mcp runtime <op> [--json] Manage the managed local runtime lifecycle
   ultrasearch-mcp init-config     Print a starter JSON config
   ultrasearch-mcp help            Show this help
 
@@ -80,6 +83,20 @@ function synchronousDoctorEndpoint(endpoint: string): string {
   }
 }
 
+function managedRuntimeStatusLines(
+  managedRuntime: ManagedRuntimeStatus | null,
+): string[] {
+  if (managedRuntime === null) return ["managed_runtime.state=unavailable"];
+  return [
+    `managed_runtime.state=${managedRuntime.state}`,
+    `managed_runtime.endpoint=${managedRuntime.endpoint}`,
+    `managed_runtime.port=${managedRuntime.port}`,
+    `managed_runtime.pid=${managedRuntime.pid ?? "none"}`,
+    `managed_runtime.generation=${managedRuntime.generation}`,
+    `managed_runtime.ownership=${managedRuntime.ownership}`,
+  ];
+}
+
 export function renderControlPlaneStatus(
   status: ControlPlaneStatus,
   command: DiagnosticCommand,
@@ -110,6 +127,7 @@ export function renderControlPlaneStatus(
     `runtime.observed_at=${status.runtime.observedAt}`,
     `runtime.endpoint=${status.runtime.endpoint ?? "null"}`,
     `runtime.diagnostic=${runtimeDiagnosticLine(status.runtime.diagnostic)}`,
+    ...managedRuntimeStatusLines(status.managedRuntime),
     `cache.state=${status.cache.state}`,
     `providers.configured_hosted_search=${status.providers.configuredHostedSearch.join(",") || "none"}`,
     `firecrawl.enabled=${firecrawl.enabled}`,
@@ -165,6 +183,9 @@ export async function runCliCommand(
       return true;
     case "status":
       await printStatus(diagnosticOutputFormat(argumentsAfterCommand));
+      return true;
+    case "runtime":
+      await runRuntimeCommand(argumentsAfterCommand);
       return true;
     case "init-config":
     case "configure":

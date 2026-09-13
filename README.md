@@ -114,9 +114,20 @@ Runtime status is observation-only. `runtime.mode` defaults to
 `external_endpoint`; `operator_compose` remains operator-owned, and
 `unavailable` disables runtime observation. A status call may make one bounded
 `GET` request to `/healthz` only for a safe HTTP(S) loopback endpoint. Unsafe
-endpoint diagnostics are redacted. The Control Plane has no lifecycle executor,
-and managed sidecars, Tauri Desktop, container management, and release work
-remain excluded from this contract.
+endpoint diagnostics are redacted.
+
+The Control Plane also owns a managed local runtime lifecycle, reached through
+`ultrasearch-mcp runtime <operation>` (`provision`, `start`, `stop`, `restart`,
+`status`, `repair`, `cleanup`). It verifies and patches a caller-staged root,
+binds the managed runtime to `127.0.0.1:18099`, verifies readiness and exactly
+one listener on the recorded loopback address owned by the recorded child
+before reporting `running`, stops only its recorded process, and deletes the
+managed root with proof. Every refusing mutating operation records `failed`
+with its typed refusal code. The lifecycle is Windows-first and refuses on
+other platforms. There is no resident watcher, no auto-restart, and no OS
+service registration; managed sidecars other than the pinned runtime, Tauri
+Desktop, container management, and release work remain excluded from this
+contract.
 
 ## Release status
 

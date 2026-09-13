@@ -1,10 +1,40 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveControlPlaneConfig } from "../../src/control-plane/config.js";
+import type { ManagedRuntimeStatus } from "../../src/control-plane/runtime-lifecycle.js";
 import {
   type ControlPlaneStatusDependencies,
   getControlPlaneStatus,
   probeLocalSearchEndpoint,
 } from "../../src/control-plane/status.js";
+
+function managedRuntimeStatus(): ManagedRuntimeStatus {
+  return {
+    state: "running",
+    endpoint: "http://127.0.0.1:18099",
+    port: 18_099,
+    pid: 51_234,
+    generation: 1,
+    ownership: "ultrasearch_managed",
+    verification: {
+      pinCommit: "a".repeat(40),
+      treeId: "b".repeat(40),
+      archiveSha256: "c".repeat(64),
+      patchSha256: "d".repeat(64),
+      patchedFileSha256: "e".repeat(64),
+      interpreterPath: "C:\\UltraSearch\\runtime\\.venv\\Scripts\\python.exe",
+    },
+    lastReadiness: {
+      status: 200,
+      at: "2026-09-12T00:00:00.000Z",
+      elapsedMs: 25,
+    },
+    lastStop: null,
+    lastCrash: null,
+    lastRefusal: null,
+    observedAt: "2026-09-12T00:00:00.000Z",
+    stateFile: "C:\\UltraSearch\\runtime\\state\\managed-runtime.json",
+  };
+}
 
 function dependencies(): ControlPlaneStatusDependencies {
   return {
@@ -35,6 +65,7 @@ function dependencies(): ControlPlaneStatusDependencies {
       exa: { state: "disabled", allowed: true },
     }),
     configuredHostedSearchProviders: vi.fn().mockReturnValue(["exa"]),
+    readManagedRuntime: vi.fn().mockResolvedValue(managedRuntimeStatus()),
   };
 }
 
@@ -180,5 +211,31 @@ describe("Control Plane status", () => {
         signal: expect.any(AbortSignal),
       }),
     );
+  });
+
+  it("adds the managed runtime projection without changing existing fields", async () => {
+    const config = resolveControlPlaneConfig({});
+    const deps = dependencies();
+
+    const status = await getControlPlaneStatus({ config, dependencies: deps });
+
+    expect(status.managedRuntime).toEqual(managedRuntimeStatus());
+    expect(deps.readManagedRuntime).toHaveBeenCalledOnce();
+    expect(status.runtime.lifecycle).toBe("unavailable");
+    expect(status.localSearch.state).toBe("reachable");
+    expect(status.cache.state).toBe("reachable");
+  });
+
+  it("reports an unavailable managed runtime projection when the reader fails", async () => {
+    const config = resolveControlPlaneConfig({});
+    const deps = dependencies();
+    (deps.readManagedRuntime as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("state_corrupt: fixture"),
+    );
+
+    const status = await getControlPlaneStatus({ config, dependencies: deps });
+
+    expect(status.managedRuntime).toBeNull();
+    expect(status.runtime.mode).toBe("external_endpoint");
   });
 });

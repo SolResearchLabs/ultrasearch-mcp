@@ -56,7 +56,24 @@ mode selection does not itself reconfigure those existing adapters.
 ## Operating boundaries
 
 HTTP transport has no built-in authentication. Operators bind it locally or
-protect it at the network layer. Runtime supervision, managed sidecars,
-container management, Tauri setup, and release operations remain future work.
-Those clients must consume the same Control Plane instead of creating separate
-route or security policy.
+protect it at the network layer. The Control Plane managed local runtime
+lifecycle starts only the recorded interpreter of a caller-staged root, on
+loopback `127.0.0.1:18099`, with a strict allowlisted child environment and a
+per-start generated `SEARXNG_SECRET` that is never persisted; it stops only the
+recorded process after re-verifying the process identity, and it deletes the
+managed root with proof. Before reporting `running` it asserts exactly one
+listener on the recorded loopback address owned by the recorded child PID, so a
+wildcard (`0.0.0.0`) or foreign-owned listener refuses and the just-started
+child is stopped. The spawned PID is persisted as a `starting` record before
+any inspection, so a failing inspector cannot orphan an unrecorded child, and a
+refusing mutating operation persists `failed` with its typed refusal code and
+detail. The isolation guard refuses a reparse point (junction or symlink) as
+the managed root or as any existing ancestor component. There is no resident
+watcher, no auto-restart, and no OS service registration; on a non-Windows host
+every lifecycle operation, including read-only status, refuses with
+`unsupported_platform`.
+
+Runtime supervision beyond those on-demand operations, managed sidecars other
+than the pinned runtime, container management, Tauri setup, and release
+operations remain future work. Those clients must consume the same Control
+Plane instead of creating separate route or security policy.

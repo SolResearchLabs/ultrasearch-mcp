@@ -45,6 +45,11 @@ The status object includes:
 - local search endpoint and cache state;
 - an observation-only runtime projection with mode, ownership, observation,
   unavailable lifecycle, timestamp, safe endpoint, and bounded diagnostic;
+- an additive read-only `managedRuntime` projection with managed state,
+  endpoint, port, recorded pid, generation, ownership, and verification facts,
+  or `null` when no managed runtime record is available or the projection is
+  unavailable (missing record, corrupt state, refused root, or a non-Windows
+  host, where the lifecycle module refuses with `unsupported_platform`);
 - configured hosted providers, provider-control snapshots, and hosted-budget
   snapshots; and
 - Firecrawl's classification and configuration posture without exposing its
@@ -76,8 +81,27 @@ MCP configuration exports, CLI `doctor` and `status`, provider controls,
 hosted budgets, and Core search all consume the shared resolver in Phase 002.
 Core receives the resolved routing policy and enforces it during search.
 
-The Control Plane has no lifecycle executor in the current contract. Runtime
-supervision, repair mutation, managed sidecars, container management, Tauri
+The Control Plane owns a managed local runtime lifecycle in
+`src/control-plane/runtime-lifecycle.ts`, reached through
+`ultrasearch-mcp runtime <operation>` (`provision`, `start`, `stop`, `restart`,
+`status`, `repair`, `cleanup`). It verifies and patches a caller-staged root
+through the existing provisioning helper, starts the pinned runtime on
+`127.0.0.1:18099` under a strict allowlisted child environment, verifies
+readiness and the single-listener/one-owner invariant (one listener, bound to
+the recorded loopback address, owned by the recorded child PID), stops only the
+recorded process after identity re-verification, and deletes the managed root
+with proof. Its refusals are typed and fail closed: every refusing mutating
+operation persists `failed` with `lastRefusal {code, at, detail}` while it
+holds the single-writer root lock, and cleanup verifies the marker before
+creating any lock or state artifact. The lifecycle is Windows-first: on any
+other platform every operation, including read-only `status` and `reconcile`,
+refuses with `unsupported_platform`, and the additive doctor/status projection
+reports that as `null` instead of failing the status result.
+
+There is no resident watcher, no auto-restart, and no OS service registration.
+Automated acquisition, interpreter creation, and package installation remain
+outside product code. Runtime supervision beyond those on-demand operations,
+managed sidecars other than the pinned runtime, container management, Tauri
 Desktop, and release operations remain excluded. They may become future
 clients of this same Control Plane rather than separate configuration or
 routing implementations.

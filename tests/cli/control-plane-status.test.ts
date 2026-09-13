@@ -63,6 +63,21 @@ const status = {
     endpoint: "http://127.0.0.1:8099",
     diagnostic: null,
   },
+  managedRuntime: {
+    state: "running" as const,
+    endpoint: "http://127.0.0.1:18099",
+    port: 18_099,
+    pid: 51_234,
+    generation: 2,
+    ownership: "ultrasearch_managed" as const,
+    verification: null,
+    lastReadiness: null,
+    lastStop: null,
+    lastCrash: null,
+    lastRefusal: null,
+    observedAt: "2026-09-11T00:00:00.000Z",
+    stateFile: "C:\\UltraSearch\\runtime\\state\\managed-runtime.json",
+  },
   cache: { state: "reachable" as const },
   providers: {
     configuredHostedSearch: ["exa"],
@@ -140,9 +155,27 @@ describe("Control Plane CLI diagnostics", () => {
     expect(first).toContain("runtime.observed_at=2026-09-11T00:00:00.000Z");
     expect(first).toContain("runtime.endpoint=http://127.0.0.1:8099");
     expect(first).toContain("runtime.diagnostic=none");
+    expect(first).toContain("managed_runtime.state=running");
+    expect(first).toContain("managed_runtime.endpoint=http://127.0.0.1:18099");
+    expect(first).toContain("managed_runtime.port=18099");
+    expect(first).toContain("managed_runtime.pid=51234");
+    expect(first).toContain("managed_runtime.generation=2");
+    expect(first).toContain("managed_runtime.ownership=ultrasearch_managed");
     expect(first).toContain("cache.state=reachable");
     expect(first).toContain("firecrawl.configured=true");
     expect(first).not.toContain("plaintext-test-value");
+  });
+
+  it("renders an unavailable additive managed runtime projection", () => {
+    const output = renderControlPlaneStatus(
+      { ...status, managedRuntime: null },
+      "status",
+      "human",
+    );
+
+    expect(output).toContain("runtime.lifecycle=unavailable");
+    expect(output).toContain("managed_runtime.state=unavailable");
+    expect(output).not.toContain("managed_runtime.pid");
   });
 
   it("routes both diagnostic commands through one shared non-mutating status call", async () => {

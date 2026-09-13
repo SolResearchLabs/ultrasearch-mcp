@@ -20,6 +20,12 @@ import {
   type RuntimeObservationResult,
   type RuntimeStatus,
 } from "./runtime.js";
+import {
+  defaultManagedRuntimeRoot,
+  type ManagedRuntimeStatus,
+  managedRuntimePathsForRoot,
+  readManagedRuntimeStatus,
+} from "./runtime-lifecycle.js";
 
 export type ProbeState = LocalSearchStatus["state"];
 export type LocalEndpointStatus = LocalSearchStatus;
@@ -37,6 +43,11 @@ export interface ControlPlaneStatusDependencies {
   hostedSearchControlSnapshot: () => unknown;
   hostedSearchBudgetSnapshot: () => Promise<unknown>;
   configuredHostedSearchProviders: () => string[];
+  /**
+   * Read-only managed runtime projection. It never mutates a runtime, and it
+   * resolves `null` when no managed runtime record is available.
+   */
+  readManagedRuntime: () => Promise<ManagedRuntimeStatus | null>;
 }
 
 export interface ControlPlaneStatus {
@@ -49,6 +60,8 @@ export interface ControlPlaneStatus {
   routing: ResolvedRoutingPolicy;
   localSearch: LocalEndpointStatus;
   runtime: RuntimeStatus;
+  /** Additive managed runtime projection; `null` when it is unavailable. */
+  managedRuntime: ManagedRuntimeStatus | null;
   cache: CacheStatus;
   providers: {
     configuredHostedSearch: string[];
@@ -79,6 +92,24 @@ export async function probeLocalSearchEndpoint(
   ).localSearch;
 }
 
+/**
+ * Default read-only managed runtime projection. It reads the default product
+ * root (`%LOCALAPPDATA%\UltraSearch\runtime`) and never writes; any unavailable
+ * projection (missing record, corrupt state, refused root, refused platform)
+ * resolves `null` instead of failing the status result. The lifecycle module
+ * refuses uniformly - including the read-only status - on non-Windows hosts,
+ * and this additive projection reports that as `null`.
+ */
+async function defaultReadManagedRuntime(): Promise<ManagedRuntimeStatus | null> {
+  try {
+    return await readManagedRuntimeStatus({
+      paths: managedRuntimePathsForRoot(defaultManagedRuntimeRoot()),
+    });
+  } catch {
+    return null;
+  }
+}
+
 const defaultDependencies: ControlPlaneStatusDependencies = {
   observeRuntime,
   probeCache: async () => ({
@@ -88,6 +119,7 @@ const defaultDependencies: ControlPlaneStatusDependencies = {
   hostedSearchControlSnapshot,
   hostedSearchBudgetSnapshot,
   configuredHostedSearchProviders,
+  readManagedRuntime: defaultReadManagedRuntime,
 };
 
 export interface ControlPlaneStatusOptions {
@@ -110,6 +142,20 @@ function diagnosticConfigValues(
       endpoint: "[redacted]",
     },
   };
+}
+
+/**
+ * Additive managed runtime projection. A failing reader never fails the status
+ * result: an unavailable projection is reported as `null`.
+ */
+async function readManagedRuntimeProjection(
+  dependencies: ControlPlaneStatusDependencies,
+): Promise<ManagedRuntimeStatus | null> {
+  try {
+    return await dependencies.readManagedRuntime();
+  } catch {
+    return null;
+  }
 }
 
 function statusLocalSearch(
@@ -146,11 +192,13 @@ export async function getControlPlaneStatus(
     endpoint: config.values.localSearch.endpoint,
     ...(options.clock ? { clock: options.clock } : {}),
   };
-  const [observation, cache, hostedSearchBudget] = await Promise.all([
-    dependencies.observeRuntime(runtimeOptions),
-    dependencies.probeCache(),
-    dependencies.hostedSearchBudgetSnapshot(),
-  ]);
+  const [observation, cache, hostedSearchBudget, managedRuntime] =
+    await Promise.all([
+      dependencies.observeRuntime(runtimeOptions),
+      dependencies.probeCache(),
+      dependencies.hostedSearchBudgetSnapshot(),
+      readManagedRuntimeProjection(dependencies),
+    ]);
   const { runtime } = observation;
   const localSearch = statusLocalSearch(
     config,
@@ -168,6 +216,7 @@ export async function getControlPlaneStatus(
     routing: resolveRoutingPolicy(config),
     localSearch,
     runtime,
+    managedRuntime,
     cache,
     providers: {
       configuredHostedSearch: dependencies.configuredHostedSearchProviders(),

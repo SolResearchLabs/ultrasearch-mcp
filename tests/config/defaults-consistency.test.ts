@@ -163,7 +163,9 @@ describe("FULL-PACKAGE-001 configuration defaults", () => {
     expect(configuration).toContain("`runtime.mode`");
     expect(configuration).toContain("`ULTRASEARCH_RUNTIME_MODE`");
     expect(controlPlane).toContain("`/healthz`");
-    expect(controlPlane).toContain("no lifecycle executor");
+    expect(controlPlane).toContain("no resident watcher");
+    expect(controlPlane).toContain("no auto-restart");
+    expect(controlPlane).toContain("no OS service registration");
     expect(localRuntime).toContain("`operator_compose`");
     expect(readme).toContain("`runtime.mode`");
   });
