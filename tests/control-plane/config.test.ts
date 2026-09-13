@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   CONFIG_SCHEMA,
   type RoutingMode,
@@ -14,6 +14,39 @@ import {
   redactWithConfigSchema,
 } from "../../src/control-plane/redaction.js";
 import { resetRuntimeConfigForTests } from "../../src/runtime-config.js";
+
+// The compatibility resolver falls back to `process.env` when a test supplies
+// no explicit `environment` layer. Ambient Firecrawl values would then win over
+// the user-config fixtures those tests pin, so capture and remove the Firecrawl
+// compatibility names per test and restore them afterwards (FP-006
+// posture-independence pattern, same shape as tests/hermeticity.test.ts).
+const AMBIENT_FIRECRAWL_ENV_NAMES = [
+  "ULTRASEARCH_FIRECRAWL_ENABLED",
+  "FIRECRAWL_ENABLED",
+  "ULTRASEARCH_FIRECRAWL_URL",
+  "FIRECRAWL_URL",
+  "ULTRASEARCH_FIRECRAWL_API_KEY",
+  "FIRECRAWL_API_KEY",
+] as const;
+
+const capturedAmbientFirecrawlEnv = new Map<string, string | undefined>();
+
+beforeEach(() => {
+  capturedAmbientFirecrawlEnv.clear();
+  for (const name of AMBIENT_FIRECRAWL_ENV_NAMES) {
+    capturedAmbientFirecrawlEnv.set(name, process.env[name]);
+    delete process.env[name];
+  }
+});
+
+afterEach(() => {
+  for (const name of AMBIENT_FIRECRAWL_ENV_NAMES) {
+    const value = capturedAmbientFirecrawlEnv.get(name);
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  capturedAmbientFirecrawlEnv.clear();
+});
 
 describe("Control Plane effective configuration", () => {
   it("applies operation, environment, user config, profile, and defaults in order", () => {

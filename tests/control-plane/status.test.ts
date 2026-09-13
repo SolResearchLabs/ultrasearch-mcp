@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveControlPlaneConfig } from "../../src/control-plane/config.js";
 import type { ManagedRuntimeStatus } from "../../src/control-plane/runtime-lifecycle.js";
 import {
@@ -6,6 +6,39 @@ import {
   getControlPlaneStatus,
   probeLocalSearchEndpoint,
 } from "../../src/control-plane/status.js";
+
+// The status fixture resolves its config without an explicit `environment`
+// layer, so the resolver falls back to `process.env` and an ambient Firecrawl
+// value would win over the user-config fixture this suite pins. Capture and
+// remove the Firecrawl compatibility names per test; restore them afterwards
+// (FP-006 posture-independence pattern).
+const AMBIENT_FIRECRAWL_ENV_NAMES = [
+  "ULTRASEARCH_FIRECRAWL_ENABLED",
+  "FIRECRAWL_ENABLED",
+  "ULTRASEARCH_FIRECRAWL_URL",
+  "FIRECRAWL_URL",
+  "ULTRASEARCH_FIRECRAWL_API_KEY",
+  "FIRECRAWL_API_KEY",
+] as const;
+
+const capturedAmbientFirecrawlEnv = new Map<string, string | undefined>();
+
+beforeEach(() => {
+  capturedAmbientFirecrawlEnv.clear();
+  for (const name of AMBIENT_FIRECRAWL_ENV_NAMES) {
+    capturedAmbientFirecrawlEnv.set(name, process.env[name]);
+    delete process.env[name];
+  }
+});
+
+afterEach(() => {
+  for (const name of AMBIENT_FIRECRAWL_ENV_NAMES) {
+    const value = capturedAmbientFirecrawlEnv.get(name);
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  capturedAmbientFirecrawlEnv.clear();
+});
 
 function managedRuntimeStatus(): ManagedRuntimeStatus {
   return {

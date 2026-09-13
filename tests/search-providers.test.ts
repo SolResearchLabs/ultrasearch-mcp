@@ -18,8 +18,25 @@ import { tinyfishSearchProvider } from "../src/search-providers/tinyfish.js";
 
 const originalEnv = { ...process.env };
 
+// The providers read the canonical `ULTRASEARCH_*` alias before the plain
+// variable this suite pins (`providerApiKey`/`providerOption`), so an ambient
+// export would shadow every synthetic value below. Each test therefore removes
+// the conflicting ambient names; `afterEach` restores the captured process
+// environment exactly (FP-006 posture-independence pattern).
+const AMBIENT_SHADOWING_NAMES = [
+  "ULTRASEARCH_EXA_API_KEY",
+  "ULTRASEARCH_EXA_SEARCH_TYPE",
+  "ULTRASEARCH_PARALLEL_API_KEY",
+  "ULTRASEARCH_PARALLEL_SEARCH_MODE",
+  "ULTRASEARCH_TINYFISH_API_KEY",
+  "ULTRASEARCH_TINYFISH_LOCATION",
+  "ULTRASEARCH_BRAVE_API_KEY",
+  "BRAVE_API_KEY",
+] as const;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  for (const name of AMBIENT_SHADOWING_NAMES) delete process.env[name];
   process.env.EXA_API_KEY = "exa-test";
   process.env.PARALLEL_API_KEY = "parallel-test";
   process.env.TINYFISH_API_KEY = "tinyfish-test";
