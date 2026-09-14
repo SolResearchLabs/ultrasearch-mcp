@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -49,7 +51,10 @@ vi.mock("../../src/control-plane/index.js", () => ({
 }));
 
 import { printHelp, runCliCommand } from "../../src/cli/configure.js";
-import { RUNTIME_CLI_OPERATIONS } from "../../src/cli/runtime.js";
+import {
+  RUNTIME_CLI_OPERATIONS,
+  runtimeCliOptions,
+} from "../../src/cli/runtime.js";
 
 const managedStatus = {
   state: "running" as const,
@@ -89,6 +94,10 @@ const cleanupResult = {
 };
 
 const defaultPaths = mocks.pathsForRoot("C:\\managed-runtime-root");
+const defaultSettingsPath = join(
+  defaultPaths.managedRoot,
+  "searxng-settings.yml",
+);
 
 function captureStdout<T>(run: () => Promise<T> | T): Promise<{
   output: string;
@@ -134,6 +143,19 @@ describe("managed runtime CLI surface", () => {
     vi.clearAllMocks();
   });
 
+  it("selects the root-local caller-staged settings path exactly once", () => {
+    mocks.root.mockClear();
+    mocks.pathsForRoot.mockClear();
+
+    expect(runtimeCliOptions()).toEqual({
+      paths: defaultPaths,
+      settingsPath: defaultSettingsPath,
+    });
+    expect(mocks.root).toHaveBeenCalledTimes(1);
+    expect(mocks.pathsForRoot).toHaveBeenCalledTimes(1);
+    expect(mocks.pathsForRoot).toHaveBeenCalledWith("C:\\managed-runtime-root");
+  });
+
   it("dispatches each operation to the Control Plane module with the default root", async () => {
     const expected = {
       provision: mocks.provision,
@@ -153,6 +175,7 @@ describe("managed runtime CLI surface", () => {
       expect(result).toBe(true);
       expect(expected[operation]).toHaveBeenCalledWith({
         paths: defaultPaths,
+        settingsPath: defaultSettingsPath,
       });
     }
     expect(mocks.root).toHaveBeenCalled();
@@ -192,7 +215,10 @@ describe("managed runtime CLI surface", () => {
     expect(output).toContain("managed_runtime.path_absent=true");
     expect(output).toContain("managed_runtime.listeners_after=0");
     expect(output).toContain("managed_runtime.survivors_after=0");
-    expect(mocks.cleanup).toHaveBeenCalledWith({ paths: defaultPaths });
+    expect(mocks.cleanup).toHaveBeenCalledWith({
+      paths: defaultPaths,
+      settingsPath: defaultSettingsPath,
+    });
   });
 
   it("renders a typed refusal without throwing", async () => {

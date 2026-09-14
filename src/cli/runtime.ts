@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import {
   cleanupManagedRuntime,
   defaultManagedRuntimeRoot,
@@ -75,7 +77,11 @@ function isRuntimeCliOperation(
  * key, or environment key exists for the managed runtime.
  */
 export function runtimeCliOptions(): ManagedRuntimeOptions {
-  return { paths: managedRuntimePathsForRoot(defaultManagedRuntimeRoot()) };
+  const paths = managedRuntimePathsForRoot(defaultManagedRuntimeRoot());
+  return {
+    paths,
+    settingsPath: join(paths.managedRoot, "searxng-settings.yml"),
+  };
 }
 
 function runRuntimeOperation(

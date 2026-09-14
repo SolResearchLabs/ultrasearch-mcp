@@ -124,6 +124,10 @@ const CLEANUP_RESULT = {
 };
 
 const defaultPaths = mocks.pathsForRoot("C:\\managed-runtime-root");
+const defaultSettingsPath = join(
+  defaultPaths.managedRoot,
+  "searxng-settings.yml",
+);
 
 const USAGE_TEXT = [
   "UltraSearch MCP runtime",
@@ -261,7 +265,10 @@ describe("H6 runtime command dispatch matrix", () => {
         runCliCommand(["runtime", operation]),
       );
       expect(result).toBe(true);
-      expect(expected[operation]).toHaveBeenCalledWith({ paths: defaultPaths });
+      expect(expected[operation]).toHaveBeenCalledWith({
+        paths: defaultPaths,
+        settingsPath: defaultSettingsPath,
+      });
     }
     expect(mocks.root).toHaveBeenCalledTimes(RUNTIME_CLI_OPERATIONS.length);
     expect(mocks.pathsForRoot).toHaveBeenCalledWith("C:\\managed-runtime-root");
@@ -350,7 +357,10 @@ describe("H6 human output matrix (per operation)", () => {
     expect(output).toContain("managed_runtime.listeners_after=0");
     expect(output).toContain("managed_runtime.survivors_after=0");
     expect(output).toContain("managed_runtime.cleared_lock_pids=none");
-    expect(mocks.cleanup).toHaveBeenCalledWith({ paths: defaultPaths });
+    expect(mocks.cleanup).toHaveBeenCalledWith({
+      paths: defaultPaths,
+      settingsPath: defaultSettingsPath,
+    });
   });
 });
 

@@ -992,6 +992,8 @@ describe("Control Plane managed runtime lifecycle", () => {
       join(fixture.paths.checkoutPath, "searx", "settings.yml"),
     );
     expect(environment.SEARXNG_DISABLE_ETC_SETTINGS).toBe("1");
+    expect(environment).not.toHaveProperty("SEARXNG_PORT");
+    expect(environment).not.toHaveProperty("SEARXNG_BIND");
     expect(environment.SEARXNG_SECRET).toMatch(/^[0-9a-f]{64}$/);
     expect(environment).not.toHaveProperty("TINYFISH_API_KEY");
     expect(environment).not.toHaveProperty("ULTRASEARCH_TINYFISH_API_KEY");
@@ -1012,6 +1014,44 @@ describe("Control Plane managed runtime lifecycle", () => {
     );
     expect(readdirSync(dirname(fixture.stateFile))).toEqual([
       "managed-runtime.json",
+    ]);
+  });
+
+  it("uses an explicitly supplied caller-staged settings path and keeps fixed readiness", async () => {
+    const fixture = await provisionedFixture();
+    const settingsPath = join(fixture.root, "searxng-settings.yml");
+    writeFileSync(
+      settingsPath,
+      [
+        "server:",
+        '  bind_address: "127.0.0.1"',
+        "  port: 18099",
+        "search:",
+        "  formats:",
+        "    - html",
+        "    - json",
+        "use_default_settings:",
+        "  engines:",
+        "    keep_only:",
+        "      - wikipedia",
+        "      - bing",
+        "      - duckduckgo",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const started = await startManagedRuntime(
+      fixture.options({ settingsPath }),
+    );
+
+    expect(started.outcome).toBe("started");
+    const environment = fixture.layer.spawned[0]?.request.environment ?? {};
+    expect(environment.SEARXNG_SETTINGS_PATH).toBe(settingsPath);
+    expect(environment).not.toHaveProperty("SEARXNG_PORT");
+    expect(environment).not.toHaveProperty("SEARXNG_BIND");
+    expect(fixture.readiness.calls).toEqual([
+      `http://${MANAGED_RUNTIME_HOST}:${MANAGED_RUNTIME_PORT}/`,
     ]);
   });
 
