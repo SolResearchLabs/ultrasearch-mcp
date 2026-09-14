@@ -2327,7 +2327,7 @@ function clearReadOnlyAttributes(path: string, venvRoot: string): void {
       clearReadOnlyAttributes(child, venvRoot);
     }
     try {
-      chmodSync(child, 0o666);
+      chmodSync(child, entry.isDirectory() ? 0o777 : 0o666);
     } catch {
       // A locked or missing entry is reported by the deletion proof instead.
     }
