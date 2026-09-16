@@ -1848,6 +1848,84 @@ describe("Control Plane managed runtime lifecycle", () => {
     expect(again.pathAbsent).toBe(true);
   });
 
+  it("retries a transient EPERM whole-root deletion and proves cleanup after success", async () => {
+    const fixture = await provisionedFixture();
+    const sleeps: number[] = [];
+    let calls = 0;
+    fixture.dependencies.sleep = async (milliseconds) => {
+      sleeps.push(milliseconds);
+    };
+    fixture.dependencies.removeRoot = (path) => {
+      calls += 1;
+      if (calls === 1) {
+        throw Object.assign(new Error("EPERM fixture"), {
+          code: "EPERM",
+          errno: -4048,
+          syscall: "unlink",
+          path: join(fixture.venvRoot, "locked.pyd"),
+        });
+      }
+      rmSync(path, { recursive: true, force: true });
+    };
+
+    const cleaned = await cleanupManagedRuntime(fixture.options());
+
+    expect(calls).toBe(2);
+    expect(sleeps).toEqual([100]);
+    expect(cleaned).toMatchObject({
+      outcome: "deleted",
+      pathAbsent: true,
+      listenersAfter: 0,
+      survivorPids: [],
+    });
+    expect(existsSync(fixture.root)).toBe(false);
+    expect(existsSync(fixture.markerFile)).toBe(false);
+  });
+
+  it("bounds persistent EPERM cleanup, preserves the cause, and restores the marker", async () => {
+    const fixture = await provisionedFixture();
+    const sleeps: number[] = [];
+    let calls = 0;
+    const lockedPath = join(
+      fixture.venvRoot,
+      "Lib",
+      "site-packages",
+      "markupsafe",
+      "_speedups.cp312-win_amd64.pyd",
+    );
+    fixture.dependencies.sleep = async (milliseconds) => {
+      sleeps.push(milliseconds);
+    };
+    fixture.dependencies.removeRoot = () => {
+      calls += 1;
+      rmSync(fixture.markerFile, { force: true });
+      throw Object.assign(
+        new Error(`EPERM: operation not permitted, unlink '${lockedPath}'`),
+        { code: "EPERM", errno: -4048, syscall: "unlink", path: lockedPath },
+      );
+    };
+
+    const error = await expectRefusal(() =>
+      cleanupManagedRuntime(fixture.options()),
+    );
+
+    expect(calls).toBe(8);
+    expect(sleeps).toEqual([100, 250, 500, 1_000, 2_000, 4_000, 8_000]);
+    expect(error.code).toBe("cleanup_incomplete");
+    expect(error.detail).toContain("pathAbsent=false");
+    expect(error.detail).toContain("code=EPERM");
+    expect(error.detail).toContain("errno=-4048");
+    expect(error.detail).toContain("syscall=unlink");
+    expect(error.detail).toContain(lockedPath);
+    expect((error.cause as { code?: unknown }).code).toBe("EPERM");
+    expect(existsSync(fixture.root)).toBe(true);
+    expect(existsSync(fixture.markerFile)).toBe(true);
+    expect(fixture.stateRecord()).toMatchObject({
+      state: "failed",
+      lastRefusal: { code: "cleanup_incomplete" },
+    });
+  });
+
   it("refuses cleanup of a directory without the managed marker and leaves it byte-identical", async () => {
     const fixture = createRuntimeFixture();
     mkdirSync(join(fixture.root, "searxng"), { recursive: true });

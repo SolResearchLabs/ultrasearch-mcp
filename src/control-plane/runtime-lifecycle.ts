@@ -92,6 +92,9 @@ export const MANAGED_RUNTIME_READINESS_POLL_INTERVAL_MS = 250;
 export const MANAGED_RUNTIME_READINESS_PROBE_TIMEOUT_MS = 1_000;
 export const MANAGED_RUNTIME_STOP_TIMEOUT_MS = 15_000;
 export const MANAGED_RUNTIME_STOP_POLL_INTERVAL_MS = 250;
+const MANAGED_RUNTIME_CLEANUP_EPERM_BACKOFF_MS = [
+  100, 250, 500, 1_000, 2_000, 4_000, 8_000,
+] as const;
 export const MANAGED_RUNTIME_MARKER_FILE = ".ultrasearch-managed-runtime";
 export const MANAGED_RUNTIME_STATE_FILE = "state/managed-runtime.json";
 export const MANAGED_RUNTIME_LOCK_FILE = "state/lock.json";
@@ -175,12 +178,18 @@ export type ManagedRuntimeRefusalCode =
 export class ManagedRuntimeRefusalError extends Error {
   readonly code: ManagedRuntimeRefusalCode;
   readonly detail: string;
+  readonly cause?: unknown;
 
-  constructor(code: ManagedRuntimeRefusalCode, detail: string) {
+  constructor(
+    code: ManagedRuntimeRefusalCode,
+    detail: string,
+    cause?: unknown,
+  ) {
     super(`Managed runtime refused (${code}): ${detail}`);
     this.name = "ManagedRuntimeRefusalError";
     this.code = code;
     this.detail = detail;
+    this.cause = cause;
   }
 }
 
@@ -358,6 +367,8 @@ export interface ManagedRuntimeDependencies {
   readinessProbe?: ManagedRuntimeReadinessProbe;
   clock?: () => Date;
   sleep?: (milliseconds: number) => Promise<void>;
+  /** Test-only whole-root remover; production uses bounded `rmSync`. */
+  removeRoot?: (path: string) => void;
   /**
    * Test-only expected digests. Production callers never set this: the
    * recorded Stage C2/C3 constants are used when it is absent, so a synthetic
@@ -441,6 +452,7 @@ interface ResolvedManagedRuntime {
   applyWindowsPatch: typeof applySearxngWindowsPatch;
   clock: () => Date;
   sleep: (milliseconds: number) => Promise<void>;
+  removeRoot: (path: string) => void;
 }
 
 /**
@@ -455,8 +467,9 @@ interface ResolvedInterpreter {
 function refuse(
   code: ManagedRuntimeRefusalCode,
   detail: string,
+  cause?: unknown,
 ): ManagedRuntimeRefusalError {
-  return new ManagedRuntimeRefusalError(code, detail);
+  return new ManagedRuntimeRefusalError(code, detail, cause);
 }
 
 function errorMessage(error: unknown): string {
@@ -524,6 +537,15 @@ function resolveManagedRuntime(
       dependencies.sleep ??
       ((milliseconds) =>
         new Promise((settle) => setTimeout(settle, milliseconds))),
+    removeRoot:
+      dependencies.removeRoot ??
+      ((path) =>
+        rmSync(path, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 100,
+        })),
   };
 }
 
@@ -2339,6 +2361,71 @@ function clearReadOnlyAttributes(path: string, venvRoot: string): void {
   }
 }
 
+type CleanupFilesystemError = Error & {
+  code?: unknown;
+  errno?: unknown;
+  syscall?: unknown;
+  path?: unknown;
+  dest?: unknown;
+};
+
+function cleanupFilesystemErrorDetail(error: unknown): string {
+  if (!(error instanceof Error)) return `message=${String(error)}`;
+  const value = error as CleanupFilesystemError;
+  return [
+    ["code", value.code],
+    ["errno", value.errno],
+    ["syscall", value.syscall],
+    ["path", value.path],
+    ["dest", value.dest],
+    ["message", value.message],
+  ]
+    .filter(([, item]) => item !== undefined)
+    .map(([key, item]) => `${key}=${String(item)}`)
+    .join(" ");
+}
+
+function restoreCleanupRequiredMarker(
+  runtime: ResolvedManagedRuntime,
+  record: ManagedRuntimeStateRecord | null,
+  at: string,
+): void {
+  if (!existsSync(runtime.paths.managedRoot)) return;
+  writeFileSync(
+    runtime.markerFile,
+    `${JSON.stringify({ schemaVersion: 1, kind: "ultrasearch-managed-runtime", pinCommit: record?.pinCommit ?? null, cleanupRequired: true, updatedAt: at })}\n`,
+    "utf8",
+  );
+}
+
+async function removeManagedRootWithRetry(
+  runtime: ResolvedManagedRuntime,
+): Promise<unknown | null> {
+  let lastError: unknown = null;
+  for (
+    let attempt = 0;
+    attempt <= MANAGED_RUNTIME_CLEANUP_EPERM_BACKOFF_MS.length;
+    attempt += 1
+  ) {
+    if (!existsSync(runtime.paths.managedRoot)) return null;
+    try {
+      runtime.removeRoot(runtime.paths.managedRoot);
+      return null;
+    } catch (error) {
+      lastError = error;
+      if (!existsSync(runtime.paths.managedRoot)) return null;
+      if (
+        !isErrnoCode(error, "EPERM") ||
+        attempt === MANAGED_RUNTIME_CLEANUP_EPERM_BACKOFF_MS.length
+      )
+        return lastError;
+      const delay = MANAGED_RUNTIME_CLEANUP_EPERM_BACKOFF_MS[attempt];
+      if (delay !== undefined) await runtime.sleep(delay);
+    }
+  }
+  return lastError;
+}
+
 export async function cleanupManagedRuntime(
   options: ManagedRuntimeOptions,
 ): Promise<ManagedRuntimeCleanupResult> {
@@ -2398,18 +2485,16 @@ export async function cleanupManagedRuntime(
     }
 
     clearReadOnlyAttributes(runtime.paths.managedRoot, runtime.venvRoot);
-    try {
-      rmSync(runtime.paths.managedRoot, {
-        recursive: true,
-        force: true,
-        maxRetries: 5,
-        retryDelay: 100,
-      });
-    } catch {
-      // The deletion proof below reports the failure as `cleanup_incomplete`.
-    }
-
+    const deletionError = await removeManagedRootWithRetry(runtime);
     const pathAbsent = !existsSync(runtime.paths.managedRoot);
+    let markerRestoreError: unknown = null;
+    if (!pathAbsent) {
+      try {
+        restoreCleanupRequiredMarker(runtime, record, at);
+      } catch (error) {
+        markerRestoreError = error;
+      }
+    }
     const listenersAfter = runtime.processLayer.listenersOnPort(runtime.port);
     // The survivor scan is root-scoped (`DQ-035` R1). When a state record
     // names a child, the scan also follows that recorded pid and its
@@ -2426,9 +2511,18 @@ export async function cleanupManagedRuntime(
       listenersAfter.length > 0 ||
       survivors.survivorsPresent
     ) {
+      const deletionDetail =
+        deletionError === null
+          ? ""
+          : `; deletion error: ${cleanupFilesystemErrorDetail(deletionError)}`;
+      const markerDetail =
+        markerRestoreError === null
+          ? ""
+          : `; cleanup marker restore error: ${cleanupFilesystemErrorDetail(markerRestoreError)}`;
       throw refuse(
         "cleanup_incomplete",
-        `the managed root deletion is not proven: pathAbsent=${String(pathAbsent)}, ${listenersAfter.length} listener(s), ${survivors.survivorPids.length} survivor process(es)${survivors.unverifiableReason === null ? "" : `; the root-scoped survivor scan is inconclusive: ${survivors.unverifiableReason}`}`,
+        `the managed root deletion is not proven: pathAbsent=${String(pathAbsent)}, ${listenersAfter.length} listener(s), ${survivors.survivorPids.length} survivor process(es)${survivors.unverifiableReason === null ? "" : `; the root-scoped survivor scan is inconclusive: ${survivors.unverifiableReason}`}${deletionDetail}${markerDetail}`,
+        deletionError ?? markerRestoreError ?? undefined,
       );
     }
 
