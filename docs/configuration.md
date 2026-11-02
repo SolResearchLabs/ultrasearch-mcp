@@ -43,6 +43,11 @@ Config file strings can reference environment variables with `${NAME}` or `${NAM
 The default local endpoint is `http://127.0.0.1:8099`. The default routing
 mode is `local_first`.
 
+When hosted search is selected, the default provider order is
+`tinyfish,parallel,brave,tavily,you,deepseek,exa`. This order is the economic
+policy: budget status can block a provider but does not reorder a still-allowed
+provider behind a later paid provider. See ADR 0004.
+
 The profiles `local`, `hybrid`, `hosted`, and `offline` select
 `local_only`, `hybrid`, `hosted_only`, and `offline_fetch_only` respectively.
 An explicitly configured mode in an operation, environment, or user file
@@ -94,6 +99,9 @@ supported only as an advanced explicit override.
 | Provider | Canonical variable | Legacy alias | Config path |
 | --- | --- | --- | --- |
 | TinyFish | `ULTRASEARCH_TINYFISH_API_KEY` | `TINYFISH_API_KEY` | `providers.tinyfish.apiKey` |
-| Exa | `ULTRASEARCH_EXA_API_KEY` | `EXA_API_KEY` | `providers.exa.apiKey` |
 | Parallel | `ULTRASEARCH_PARALLEL_API_KEY` | `PARALLEL_API_KEY` | `providers.parallel.apiKey` |
 | Brave | `ULTRASEARCH_BRAVE_API_KEY` | `BRAVE_SEARCH_API_KEY`, `BRAVE_API_KEY` | `providers.brave.apiKey` |
+| Tavily | `ULTRASEARCH_TAVILY_API_KEY` | `TAVILY_API_KEY` | `providers.tavily.apiKey` |
+| You.com | `ULTRASEARCH_YOU_API_KEY` | `YDC_API_KEY`, `YOU_API_KEY` | `providers.you.apiKey` |
+| DeepSeek | `ULTRASEARCH_DEEPSEEK_API_KEY` | `DEEPSEEK_API_KEY` | `providers.deepseek.apiKey` |
+| Exa | `ULTRASEARCH_EXA_API_KEY` | `EXA_API_KEY` | `providers.exa.apiKey` |
