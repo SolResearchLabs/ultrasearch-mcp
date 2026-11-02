@@ -12,7 +12,6 @@ import { exaSearchProvider } from "./exa.js";
 import { parallelSearchProvider } from "./parallel.js";
 import { tavilySearchProvider } from "./tavily.js";
 import { tinyfishSearchProvider } from "./tinyfish.js";
-import { youSearchProvider } from "./you.js";
 import type {
   HostedSearchAttempt,
   HostedSearchFallbackResult,
@@ -20,6 +19,7 @@ import type {
   HostedSearchProviderId,
   HostedSearchRequest,
 } from "./types.js";
+import { youSearchProvider } from "./you.js";
 
 const EMPTY_META: SearxMeta = {
   answers: [],
