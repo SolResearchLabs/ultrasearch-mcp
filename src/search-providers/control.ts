@@ -31,10 +31,13 @@ function makeControl(id: HostedSearchProviderId): HostedProviderControl {
 }
 
 const controls: Record<HostedSearchProviderId, HostedProviderControl> = {
-  exa: makeControl("exa"),
-  parallel: makeControl("parallel"),
   tinyfish: makeControl("tinyfish"),
+  parallel: makeControl("parallel"),
   brave: makeControl("brave"),
+  tavily: makeControl("tavily"),
+  you: makeControl("you"),
+  deepseek: makeControl("deepseek"),
+  exa: makeControl("exa"),
 };
 
 export function runHostedSearchProvider<T>(

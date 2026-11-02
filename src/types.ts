@@ -123,10 +123,13 @@ export interface SearxSearchResult {
 // Built only from explicit runtime state, never inferred from logs.
 export type SearchProviderId =
   | LocalSearchProviderId
-  | "exa"
-  | "parallel"
   | "tinyfish"
+  | "parallel"
   | "brave"
+  | "tavily"
+  | "you"
+  | "deepseek"
+  | "exa"
   | "cache";
 // A registered local provider can participate in Core before it is added to
 // the configured public vocabulary. Known providers remain validated at the

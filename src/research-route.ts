@@ -17,10 +17,13 @@ import type {
 
 const PROVIDER_LABELS: Record<string, string> = {
   searxng: "SearXNG",
-  exa: "Exa",
-  parallel: "Parallel",
   tinyfish: "TinyFish",
+  parallel: "Parallel",
   brave: "Brave",
+  tavily: "Tavily",
+  you: "You.com",
+  deepseek: "DeepSeek",
+  exa: "Exa",
   cloudflare: "Cloudflare",
   crawl4ai: "Crawl4AI",
   raw: "Raw HTTP",
@@ -40,10 +43,13 @@ function routeBaseLabel(provider: string): string {
 
 const KNOWN_SEARCH_PROVIDERS: readonly SearchProviderId[] = [
   ...LOCAL_SEARCH_PROVIDER_IDS,
-  "exa",
-  "parallel",
   "tinyfish",
+  "parallel",
   "brave",
+  "tavily",
+  "you",
+  "deepseek",
+  "exa",
   "cache",
 ];
 

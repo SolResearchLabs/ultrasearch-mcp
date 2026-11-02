@@ -230,7 +230,15 @@ const FIELDS: FieldCase[] = [
       operation: ["brave"],
       environment: ["exa", "tinyfish"],
       user_config: ["parallel", "tinyfish"],
-      default: ["tinyfish", "exa", "parallel", "brave"],
+      default: [
+        "tinyfish",
+        "parallel",
+        "brave",
+        "tavily",
+        "you",
+        "deepseek",
+        "exa",
+      ],
     },
   },
   {
@@ -810,9 +818,12 @@ describe("H7 environment token parsing matrix", () => {
     });
     expect(emptyish.values.search.hostedFallback.providerOrder).toEqual([
       "tinyfish",
-      "exa",
       "parallel",
       "brave",
+      "tavily",
+      "you",
+      "deepseek",
+      "exa",
     ]);
     expect(emptyish.sources.hostedProviderOrder).toBe("default");
   });
