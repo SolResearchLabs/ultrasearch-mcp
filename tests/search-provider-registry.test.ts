@@ -1,22 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const providers = vi.hoisted(() => ({
-  exa: {
-    configured: vi.fn(),
-    search: vi.fn(),
-  },
-  parallel: {
-    configured: vi.fn(),
-    search: vi.fn(),
-  },
-  tinyfish: {
-    configured: vi.fn(),
-    search: vi.fn(),
-  },
-  brave: {
-    configured: vi.fn(),
-    search: vi.fn(),
-  },
+  tinyfish: { configured: vi.fn(), search: vi.fn() },
+  parallel: { configured: vi.fn(), search: vi.fn() },
+  brave: { configured: vi.fn(), search: vi.fn() },
+  tavily: { configured: vi.fn(), search: vi.fn() },
+  you: { configured: vi.fn(), search: vi.fn() },
+  deepseek: { configured: vi.fn(), search: vi.fn() },
+  exa: { configured: vi.fn(), search: vi.fn() },
 }));
 
 const budgets = vi.hoisted(() => ({
@@ -106,6 +97,33 @@ vi.mock("../src/search-providers/brave.js", () => ({
   },
 }));
 
+vi.mock("../src/search-providers/tavily.js", () => ({
+  tavilySearchProvider: {
+    id: "tavily",
+    capabilities: { semantic: true, recency: true, domains: true, news: true },
+    configured: providers.tavily.configured,
+    search: providers.tavily.search,
+  },
+}));
+
+vi.mock("../src/search-providers/you.js", () => ({
+  youSearchProvider: {
+    id: "you",
+    capabilities: { semantic: false, recency: true, domains: true, news: true },
+    configured: providers.you.configured,
+    search: providers.you.search,
+  },
+}));
+
+vi.mock("../src/search-providers/deepseek.js", () => ({
+  deepseekSearchProvider: {
+    id: "deepseek",
+    capabilities: { semantic: true, recency: true, domains: true, news: true },
+    configured: providers.deepseek.configured,
+    search: providers.deepseek.search,
+  },
+}));
+
 import {
   configuredHostedSearchProviders,
   searchHostedFallback,
@@ -152,14 +170,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   delete process.env.HOSTED_SEARCH_PROVIDER_ORDER;
   delete process.env.HOSTED_SEARCH_FALLBACK_ENABLED;
-  providers.exa.configured.mockReturnValue(true);
-  providers.parallel.configured.mockReturnValue(true);
-  providers.tinyfish.configured.mockReturnValue(true);
-  providers.brave.configured.mockReturnValue(true);
-  providers.exa.search.mockResolvedValue([]);
-  providers.parallel.search.mockResolvedValue([]);
-  providers.tinyfish.search.mockResolvedValue([]);
-  providers.brave.search.mockResolvedValue([]);
+  for (const provider of Object.values(providers)) {
+    provider.configured.mockReturnValue(true);
+    provider.search.mockResolvedValue([]);
+  }
   budgets.getStatus.mockImplementation(async (provider: string) =>
     budgetStatus(provider, "disabled"),
   );
@@ -182,6 +196,9 @@ describe("hosted search registry", () => {
     expect(providers.parallel.search).toHaveBeenCalledTimes(1);
     expect(providers.tinyfish.search).not.toHaveBeenCalled();
     expect(providers.brave.search).not.toHaveBeenCalled();
+    expect(providers.tavily.search).not.toHaveBeenCalled();
+    expect(providers.you.search).not.toHaveBeenCalled();
+    expect(providers.deepseek.search).not.toHaveBeenCalled();
     expect(fallback?.provider).toBe("parallel");
     expect(fallback?.attempts).toEqual([
       { provider: "exa", outcome: "empty", budgetState: "disabled" },
@@ -249,18 +266,20 @@ describe("hosted search registry", () => {
     expect(providers.exa.search).not.toHaveBeenCalled();
   });
 
-  it("moves a near-limit provider behind healthier-budget providers", async () => {
+  it("keeps a near-limit provider ahead of later healthy providers", async () => {
+    process.env.HOSTED_SEARCH_PROVIDER_ORDER = "tinyfish,parallel,exa";
     budgets.getStatus.mockImplementation(async (provider: string) =>
-      budgetStatus(provider, provider === "exa" ? "near_limit" : "healthy"),
+      budgetStatus(provider, provider === "tinyfish" ? "near_limit" : "healthy"),
     );
-    providers.parallel.search.mockResolvedValueOnce([
-      result("https://parallel.test", "parallel"),
+    providers.tinyfish.search.mockResolvedValueOnce([
+      result("https://tinyfish.test", "tinyfish"),
     ]);
 
     const fallback = await searchHostedFallback(request);
 
-    expect(fallback?.provider).toBe("parallel");
-    expect(providers.parallel.search).toHaveBeenCalledTimes(1);
+    expect(fallback?.provider).toBe("tinyfish");
+    expect(providers.tinyfish.search).toHaveBeenCalledTimes(1);
+    expect(providers.parallel.search).not.toHaveBeenCalled();
     expect(providers.exa.search).not.toHaveBeenCalled();
   });
 
@@ -273,9 +292,12 @@ describe("hosted search registry", () => {
 
     expect(fallback).toBeNull();
     expect(providers.exa.search).not.toHaveBeenCalled();
-    expect(providers.parallel.search).toHaveBeenCalledTimes(1);
     expect(providers.tinyfish.search).toHaveBeenCalledTimes(1);
+    expect(providers.parallel.search).toHaveBeenCalledTimes(1);
     expect(providers.brave.search).toHaveBeenCalledTimes(1);
+    expect(providers.tavily.search).toHaveBeenCalledTimes(1);
+    expect(providers.you.search).toHaveBeenCalledTimes(1);
+    expect(providers.deepseek.search).toHaveBeenCalledTimes(1);
   });
 
   it("skips unknown budget health when fail-open is not enabled", async () => {
@@ -308,8 +330,11 @@ describe("hosted search registry", () => {
     providers.parallel.configured.mockReturnValue(false);
     expect(configuredHostedSearchProviders()).toEqual([
       "tinyfish",
-      "exa",
       "brave",
+      "tavily",
+      "you",
+      "deepseek",
+      "exa",
     ]);
   });
 });
