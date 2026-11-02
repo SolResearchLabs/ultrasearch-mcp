@@ -549,6 +549,7 @@ describe("H1 S2: local returns more than zero but fewer than minimumResults", ()
 
 describe("H1 S3: local returns zero results", () => {
   beforeEach(() => {
+    harness.hostedFallbackOrderOverride = ["tinyfish", "exa"];
     harness.configEnvironment.ULTRASEARCH_HOSTED_FALLBACK_MIN_RESULTS = "3";
     harness.localProvider.search.mockResolvedValue(localResult([]));
     armHit("exa", [hostedShape(HOSTED_URL, "exa")]);
@@ -593,6 +594,7 @@ describe("H1 S4: local hard failure (throw)", () => {
   let localFailure: Error;
 
   beforeEach(() => {
+    harness.hostedFallbackOrderOverride = ["tinyfish", "exa"];
     localFailure = new Error("local provider boom");
     harness.localProvider.search.mockRejectedValue(localFailure);
     armHit("exa", [hostedShape(HOSTED_URL, "exa")]);
@@ -633,7 +635,7 @@ describe("H1 S4: local hard failure (throw)", () => {
     armHit("exa", []);
     const outcome = await runSearch({ mode: "local_first" });
     expect(errorOf(outcome).message).toBe(
-      "SearXNG search failed (local provider boom); hosted fallback did not produce results (tinyfish=empty; exa=empty; parallel=empty; brave=empty)",
+      "SearXNG search failed (local provider boom); hosted fallback did not produce results (tinyfish=empty; exa=empty)",
     );
   });
 
@@ -704,7 +706,7 @@ describe("H1 S5: no hosted credentials configured (kill switch auto)", () => {
     harness.localProvider.search.mockRejectedValue(new Error("local down"));
     const outcome = await runSearch({ mode: "local_first" });
     expect(errorOf(outcome).message).toBe(
-      "SearXNG search failed (local down); hosted fallback did not produce results (tinyfish=unconfigured; exa=unconfigured; parallel=unconfigured; brave=unconfigured)",
+      "SearXNG search failed (local down); hosted fallback did not produce results (tinyfish=unconfigured; parallel=unconfigured; brave=unconfigured; tavily=unconfigured; you=unconfigured; deepseek=unconfigured; exa=unconfigured)",
     );
     expectNoHostedAttempt();
   });
@@ -761,6 +763,7 @@ describe("H1 S6: HOSTED_SEARCH_FALLBACK_ENABLED=false", () => {
 
 describe("H1 S7: first provider budget-blocked (fail-closed at call time)", () => {
   beforeEach(() => {
+    harness.hostedFallbackOrderOverride = ["tinyfish", "exa"];
     harness.localProvider.search.mockResolvedValue(localResult([]));
     armHit("tinyfish", async () => {
       throw new HostedSearchBudgetError(
@@ -796,6 +799,7 @@ describe("H1 S7: first provider budget-blocked (fail-closed at call time)", () =
   });
 
   it("records a pre-loop exhausted provider in its configured position", async () => {
+    harness.hostedFallbackOrderOverride = null;
     // Provider order is the economic policy. An exhausted provider is blocked
     // in place, then later providers are tried without reordering.
     armHit("exa", []);
@@ -1095,6 +1099,9 @@ describe("H1 provider/budget/kill-switch sub-matrix (packet 6.2)", () => {
       { provider: "tinyfish", outcome: "empty", budgetState: "disabled" },
       { provider: "parallel", outcome: "empty", budgetState: "disabled" },
       { provider: "brave", outcome: "empty", budgetState: "disabled" },
+      { provider: "tavily", outcome: "empty", budgetState: "disabled" },
+      { provider: "you", outcome: "empty", budgetState: "disabled" },
+      { provider: "deepseek", outcome: "empty", budgetState: "disabled" },
     ]);
     expect(harness.providerSearch.exa).not.toHaveBeenCalled();
   });
@@ -1158,6 +1165,7 @@ describe("H1 provider/budget/kill-switch sub-matrix (packet 6.2)", () => {
   });
 
   it("call-time budget error records budget_blocked and continues to the next provider", async () => {
+    harness.hostedFallbackOrderOverride = ["tinyfish", "exa"];
     armHit("tinyfish", async () => {
       throw new HostedSearchBudgetError(
         "tinyfish",
@@ -1181,6 +1189,7 @@ describe("H1 provider/budget/kill-switch sub-matrix (packet 6.2)", () => {
   });
 
   it("provider error records the message and continues to the next provider", async () => {
+    harness.hostedFallbackOrderOverride = ["tinyfish", "exa"];
     armHit("tinyfish", async () => {
       throw new Error("tinyfish exploded");
     });
@@ -1204,6 +1213,9 @@ describe("H1 provider/budget/kill-switch sub-matrix (packet 6.2)", () => {
     const outcome = await searchHostedFallbackWithAttempts(request);
     expect(outcome.enabled).toBe(true);
     expect(outcome.attempts.map((attempt) => attempt.outcome)).toEqual([
+      "unconfigured",
+      "unconfigured",
+      "unconfigured",
       "unconfigured",
       "unconfigured",
       "unconfigured",
