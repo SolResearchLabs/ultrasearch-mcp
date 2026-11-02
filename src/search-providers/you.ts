@@ -86,7 +86,9 @@ export const youSearchProvider: HostedSearchProvider = {
         .map((result) => ({
           title: result.title || result.url || "Untitled",
           url: result.url as string,
-          content: (result.snippets ?? []).filter(Boolean).join("\n") || result.description,
+          content:
+            (result.snippets ?? []).filter(Boolean).join("\n") ||
+            result.description,
           engine: "you",
           engines: ["you"],
           publishedDate: result.page_age,
