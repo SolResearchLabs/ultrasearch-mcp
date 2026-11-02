@@ -269,7 +269,10 @@ describe("hosted search registry", () => {
   it("keeps a near-limit provider ahead of later healthy providers", async () => {
     process.env.HOSTED_SEARCH_PROVIDER_ORDER = "tinyfish,parallel,exa";
     budgets.getStatus.mockImplementation(async (provider: string) =>
-      budgetStatus(provider, provider === "tinyfish" ? "near_limit" : "healthy"),
+      budgetStatus(
+        provider,
+        provider === "tinyfish" ? "near_limit" : "healthy",
+      ),
     );
     providers.tinyfish.search.mockResolvedValueOnce([
       result("https://tinyfish.test", "tinyfish"),
