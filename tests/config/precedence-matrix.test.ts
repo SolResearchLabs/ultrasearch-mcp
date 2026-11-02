@@ -230,7 +230,15 @@ const FIELDS: FieldCase[] = [
       operation: ["brave"],
       environment: ["exa", "tinyfish"],
       user_config: ["parallel", "tinyfish"],
-      default: ["tinyfish", "exa", "parallel", "brave"],
+      default: [
+        "tinyfish",
+        "parallel",
+        "brave",
+        "tavily",
+        "you",
+        "deepseek",
+        "exa",
+      ],
     },
   },
   {
