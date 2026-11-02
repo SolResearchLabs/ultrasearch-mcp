@@ -296,7 +296,6 @@ describe("Brave hosted search", () => {
   });
 });
 
-
 describe("Tavily hosted search", () => {
   it("uses basic search without answer or raw-content spend", async () => {
     mockFetch.mockResolvedValueOnce(
