@@ -12,9 +12,12 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { braveSearchProvider } from "../src/search-providers/brave.js";
+import { deepseekSearchProvider } from "../src/search-providers/deepseek.js";
 import { exaSearchProvider } from "../src/search-providers/exa.js";
 import { parallelSearchProvider } from "../src/search-providers/parallel.js";
+import { tavilySearchProvider } from "../src/search-providers/tavily.js";
 import { tinyfishSearchProvider } from "../src/search-providers/tinyfish.js";
+import { youSearchProvider } from "../src/search-providers/you.js";
 
 const originalEnv = { ...process.env };
 
@@ -32,6 +35,11 @@ const AMBIENT_SHADOWING_NAMES = [
   "ULTRASEARCH_TINYFISH_LOCATION",
   "ULTRASEARCH_BRAVE_API_KEY",
   "BRAVE_API_KEY",
+  "ULTRASEARCH_TAVILY_API_KEY",
+  "ULTRASEARCH_YOU_API_KEY",
+  "ULTRASEARCH_DEEPSEEK_API_KEY",
+  "ULTRASEARCH_DEEPSEEK_SEARCH_NEED_CONTENT",
+  "YOU_API_KEY",
 ] as const;
 
 beforeEach(() => {
@@ -41,9 +49,13 @@ beforeEach(() => {
   process.env.PARALLEL_API_KEY = "parallel-test";
   process.env.TINYFISH_API_KEY = "tinyfish-test";
   process.env.BRAVE_SEARCH_API_KEY = "brave-test";
+  process.env.TAVILY_API_KEY = "tavily-test";
+  process.env.YDC_API_KEY = "you-test";
+  process.env.DEEPSEEK_API_KEY = "deepseek-test";
   delete process.env.EXA_SEARCH_TYPE;
   delete process.env.PARALLEL_SEARCH_MODE;
   delete process.env.TINYFISH_SEARCH_LOCATION;
+  delete process.env.DEEPSEEK_SEARCH_NEED_CONTENT;
 });
 
 afterEach(() => {
@@ -280,6 +292,158 @@ describe("Brave hosted search", () => {
       engine: "brave",
       content: "main snippet\nextra one\nextra two",
       publishedDate: "2026-08-12T00:00:00Z",
+    });
+  });
+});
+
+
+describe("Tavily hosted search", () => {
+  it("uses basic search without answer or raw-content spend", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        results: [
+          {
+            title: "Tavily result",
+            url: "https://example.com/tavily",
+            content: "tavily snippet",
+            published_date: "2026-10-31",
+          },
+        ],
+      }),
+    );
+
+    const results = await tavilySearchProvider.search({
+      query: "BC real estate regulation",
+      numResults: 6,
+      category: "news",
+      timeRange: "week",
+      site: ["example.com", "docs.example.com"],
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe("https://api.tavily.com/search");
+    const options = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(options.headers).toMatchObject({
+      Authorization: "Bearer tavily-test",
+      "Content-Type": "application/json",
+    });
+    const body = JSON.parse(String(options.body));
+    expect(body).toMatchObject({
+      query: "BC real estate regulation",
+      search_depth: "basic",
+      max_results: 6,
+      include_answer: false,
+      include_raw_content: false,
+      topic: "news",
+      time_range: "week",
+      include_domains: ["example.com", "docs.example.com"],
+    });
+    expect(results[0]).toMatchObject({
+      url: "https://example.com/tavily",
+      engine: "tavily",
+      content: "tavily snippet",
+      publishedDate: "2026-10-31",
+    });
+  });
+});
+
+describe("You.com hosted search", () => {
+  it("requests web snippets without extraction and normalizes results", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        results: {
+          web: [
+            {
+              title: "You result",
+              url: "https://example.com/you",
+              description: "description",
+              snippets: ["snippet one", "snippet two"],
+              page_age: "2026-10-30T00:00:00Z",
+            },
+          ],
+        },
+      }),
+    );
+
+    const results = await youSearchProvider.search({
+      query: "BCFSA guidance",
+      numResults: 8,
+      category: "general",
+      timeRange: "month",
+      language: "en-CA",
+      site: "example.com",
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe("https://ydc-index.io/v1/search");
+    const options = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(options.headers).toMatchObject({
+      "X-API-Key": "you-test",
+      "Content-Type": "application/json",
+    });
+    const body = JSON.parse(String(options.body));
+    expect(body).toMatchObject({
+      query: "BCFSA guidance",
+      count: 8,
+      freshness: "month",
+      language: "EN-CA",
+      include_domains: ["example.com"],
+    });
+    expect(results[0]).toMatchObject({
+      url: "https://example.com/you",
+      engine: "you",
+      content: "snippet one\nsnippet two",
+      publishedDate: "2026-10-30T00:00:00Z",
+    });
+  });
+});
+
+describe("DeepSeek hosted search", () => {
+  it("uses the low-cost search API, keeps page content off, and maps ranked summaries", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        results: [
+          {
+            rerank_score: 0.95,
+            title: "DeepSeek result",
+            url: "https://example.com/deepseek",
+            snippet: "short snippet",
+            summary: "model-readable summary",
+            content: "",
+            date: "2026-10-29",
+            authority: 0.9,
+          },
+        ],
+      }),
+    );
+
+    const results = await deepseekSearchProvider.search({
+      query: "BCFSA artificial intelligence guidance",
+      numResults: 50,
+      category: "general",
+      timeRange: "month",
+      language: "en-CA",
+      site: "example.com",
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "https://api.deepseek.com/v1/tools/search",
+    );
+    const options = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(options.headers).toMatchObject({
+      Authorization: "Bearer deepseek-test",
+      "Content-Type": "application/json",
+    });
+    const body = JSON.parse(String(options.body));
+    expect(body.count).toBe(50);
+    expect(body.need_content).toBe(false);
+    expect(body.query).toContain("site:example.com");
+    expect(body.query).toContain("lang:en");
+    expect(body.query).toMatch(/after:\d{4}-\d{2}-\d{2}/);
+    expect(body.query.length).toBeLessThanOrEqual(128);
+    expect(results[0]).toMatchObject({
+      url: "https://example.com/deepseek",
+      engine: "deepseek",
+      content: "model-readable summary",
+      publishedDate: "2026-10-29",
     });
   });
 });
