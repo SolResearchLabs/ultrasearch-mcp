@@ -15,6 +15,7 @@ import { ManagedRuntimeRefusalError } from "../src/control-plane/runtime-lifecyc
 import type { ControlPlaneStatus } from "../src/control-plane/status.js";
 import { resetRuntimeConfigForTests } from "../src/runtime-config.js";
 import { braveSearchProvider } from "../src/search-providers/brave.js";
+import { deepseekSearchProvider } from "../src/search-providers/deepseek.js";
 import { exaSearchProvider } from "../src/search-providers/exa.js";
 import {
   configuredHostedSearchProviders,
@@ -22,7 +23,9 @@ import {
   searchHostedFallbackWithAttempts,
 } from "../src/search-providers/index.js";
 import { parallelSearchProvider } from "../src/search-providers/parallel.js";
+import { tavilySearchProvider } from "../src/search-providers/tavily.js";
 import { tinyfishSearchProvider } from "../src/search-providers/tinyfish.js";
+import { youSearchProvider } from "../src/search-providers/you.js";
 
 // H8 hermeticity controls: canary every recognized credential variable, prove
 // the harness suites' oracle computations are identical with the canaries set
@@ -41,6 +44,13 @@ const CREDENTIAL_CANARY_VARS = [
   "BRAVE_API_KEY",
   "BRAVE_SEARCH_API_KEY",
   "ULTRASEARCH_BRAVE_API_KEY",
+  "TAVILY_API_KEY",
+  "ULTRASEARCH_TAVILY_API_KEY",
+  "YDC_API_KEY",
+  "YOU_API_KEY",
+  "ULTRASEARCH_YOU_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "ULTRASEARCH_DEEPSEEK_API_KEY",
   "FIRECRAWL_API_KEY",
   "ULTRASEARCH_FIRECRAWL_API_KEY",
   "OLLAMA_API_KEY",
@@ -57,16 +67,22 @@ function envRef(name: string): string {
 
 const PROVIDER_ENV_NAMES: Record<string, string[]> = {
   tinyfish: ["ULTRASEARCH_TINYFISH_API_KEY", "TINYFISH_API_KEY"],
-  exa: ["ULTRASEARCH_EXA_API_KEY", "EXA_API_KEY"],
   parallel: ["ULTRASEARCH_PARALLEL_API_KEY", "PARALLEL_API_KEY"],
   brave: ["ULTRASEARCH_BRAVE_API_KEY", "BRAVE_SEARCH_API_KEY", "BRAVE_API_KEY"],
+  tavily: ["ULTRASEARCH_TAVILY_API_KEY", "TAVILY_API_KEY"],
+  you: ["ULTRASEARCH_YOU_API_KEY", "YDC_API_KEY", "YOU_API_KEY"],
+  deepseek: ["ULTRASEARCH_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"],
+  exa: ["ULTRASEARCH_EXA_API_KEY", "EXA_API_KEY"],
 };
 
 const registryProviders = {
-  exa: exaSearchProvider,
-  parallel: parallelSearchProvider,
   tinyfish: tinyfishSearchProvider,
+  parallel: parallelSearchProvider,
   brave: braveSearchProvider,
+  tavily: tavilySearchProvider,
+  you: youSearchProvider,
+  deepseek: deepseekSearchProvider,
+  exa: exaSearchProvider,
 };
 
 const ENV_ISOLATED = [
@@ -258,27 +274,34 @@ afterEach(() => {
 });
 
 describe("H8 credential canary inventory", () => {
-  it("canaries exactly the thirteen recognized credential variable names", () => {
-    expect(CREDENTIAL_CANARY_VARS).toHaveLength(13);
-    expect(new Set(CREDENTIAL_CANARY_VARS).size).toBe(13);
+  it("canaries every recognized credential variable name", () => {
+    expect(CREDENTIAL_CANARY_VARS).toHaveLength(20);
+    expect(new Set(CREDENTIAL_CANARY_VARS).size).toBe(20);
     expect([...CREDENTIAL_CANARY_VARS].sort()).toEqual([
       "BRAVE_API_KEY",
       "BRAVE_SEARCH_API_KEY",
+      "DEEPSEEK_API_KEY",
       "EXA_API_KEY",
       "FIRECRAWL_API_KEY",
       "LLM_API_KEY",
       "OLLAMA_API_KEY",
       "PARALLEL_API_KEY",
+      "TAVILY_API_KEY",
       "TINYFISH_API_KEY",
       "ULTRASEARCH_BRAVE_API_KEY",
+      "ULTRASEARCH_DEEPSEEK_API_KEY",
       "ULTRASEARCH_EXA_API_KEY",
       "ULTRASEARCH_FIRECRAWL_API_KEY",
       "ULTRASEARCH_PARALLEL_API_KEY",
+      "ULTRASEARCH_TAVILY_API_KEY",
       "ULTRASEARCH_TINYFISH_API_KEY",
+      "ULTRASEARCH_YOU_API_KEY",
+      "YDC_API_KEY",
+      "YOU_API_KEY",
     ]);
   });
 
-  it("covers every environment name the four registry providers read", () => {
+  it("covers every environment name the registry providers read", () => {
     const canaryNames = new Set<string>(CREDENTIAL_CANARY_VARS);
     for (const id of HOSTED_SEARCH_PROVIDER_IDS) {
       expect(PROVIDER_ENV_NAMES[id]).toBeDefined();
@@ -311,7 +334,7 @@ describe("H8 provider configuration is canary-driven without ambient leakage", (
     });
   }
 
-  it("with all thirteen canaries set the real registry is ambient-sensitive (the FP-006 hazard)", () => {
+  it("with all credential canaries set the real registry is ambient-sensitive (the FP-006 hazard)", () => {
     setCanaries();
     for (const id of HOSTED_SEARCH_PROVIDER_IDS) {
       expect(registryProviders[id].configured()).toBe(true);
@@ -319,9 +342,12 @@ describe("H8 provider configuration is canary-driven without ambient leakage", (
     expect(hostedSearchFallbackEnabled()).toBe(true);
     expect(configuredHostedSearchProviders()).toEqual([
       "tinyfish",
-      "exa",
       "parallel",
       "brave",
+      "tavily",
+      "you",
+      "deepseek",
+      "exa",
     ]);
   });
 
