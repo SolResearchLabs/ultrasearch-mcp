@@ -818,9 +818,12 @@ describe("H7 environment token parsing matrix", () => {
     });
     expect(emptyish.values.search.hostedFallback.providerOrder).toEqual([
       "tinyfish",
-      "exa",
       "parallel",
       "brave",
+      "tavily",
+      "you",
+      "deepseek",
+      "exa",
     ]);
     expect(emptyish.sources.hostedProviderOrder).toBe("default");
   });
