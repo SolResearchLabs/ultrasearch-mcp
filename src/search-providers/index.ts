@@ -3,14 +3,16 @@ import { getControlPlaneConfig } from "../control-plane/config.js";
 import type { SearxMeta } from "../types.js";
 import { braveSearchProvider } from "./brave.js";
 import {
-  budgetRoutingRank,
   getHostedSearchBudgetStatus,
   HostedSearchBudgetError,
   type HostedSearchBudgetStatus,
 } from "./budget.js";
+import { deepseekSearchProvider } from "./deepseek.js";
 import { exaSearchProvider } from "./exa.js";
 import { parallelSearchProvider } from "./parallel.js";
+import { tavilySearchProvider } from "./tavily.js";
 import { tinyfishSearchProvider } from "./tinyfish.js";
+import { youSearchProvider } from "./you.js";
 import type {
   HostedSearchAttempt,
   HostedSearchFallbackResult,
@@ -27,10 +29,13 @@ const EMPTY_META: SearxMeta = {
 };
 
 const PROVIDERS: Record<HostedSearchProviderId, HostedSearchProvider> = {
-  exa: exaSearchProvider,
-  parallel: parallelSearchProvider,
   tinyfish: tinyfishSearchProvider,
+  parallel: parallelSearchProvider,
   brave: braveSearchProvider,
+  tavily: tavilySearchProvider,
+  you: youSearchProvider,
+  deepseek: deepseekSearchProvider,
+  exa: exaSearchProvider,
 };
 
 const DEFAULT_ORDER: HostedSearchProviderId[] = [...HOSTED_SEARCH_PROVIDER_IDS];
@@ -72,45 +77,31 @@ export function hasUsefulPrimarySearch(
 
 interface BudgetCandidate {
   id: HostedSearchProviderId;
-  index: number;
   budget: HostedSearchBudgetStatus;
 }
 
 async function budgetAwareCandidates(
   attempts: HostedSearchAttempt[],
 ): Promise<BudgetCandidate[]> {
-  const configured: Array<{
-    id: HostedSearchProviderId;
-    index: number;
-  }> = [];
+  const configured: HostedSearchProviderId[] = [];
 
-  for (const [index, id] of providerOrder().entries()) {
+  for (const id of providerOrder()) {
     if (!PROVIDERS[id].configured()) {
       attempts.push({ provider: id, outcome: "unconfigured" });
       continue;
     }
-    configured.push({ id, index });
+    configured.push(id);
   }
 
-  const candidates = await Promise.all(
-    configured.map(async ({ id, index }) => ({
+  // Provider order is the economic policy. Budget health is a hard gate, not
+  // a reordering signal: a near-limit free provider should still be consumed
+  // before a later paid provider while it remains allowed.
+  return Promise.all(
+    configured.map(async (id) => ({
       id,
-      index,
       budget: await getHostedSearchBudgetStatus(id),
     })),
   );
-
-  // Keep the operator's configured order inside each budget-health class. A
-  // near-limit provider moves behind healthy/uncapped providers; unknown health
-  // moves behind near-limit when fail-open is enabled. Exhausted/fail-closed
-  // unknown providers remain in the list only so the attempt trail can explain
-  // why they were skipped.
-  candidates.sort(
-    (a, b) =>
-      budgetRoutingRank(a.budget.state) - budgetRoutingRank(b.budget.state) ||
-      a.index - b.index,
-  );
-  return candidates;
 }
 
 export interface HostedSearchFallbackOutcome {
