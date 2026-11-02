@@ -18,9 +18,12 @@ export const RUNTIME_MODES = [
 
 export const HOSTED_SEARCH_PROVIDER_IDS = [
   "tinyfish",
-  "exa",
   "parallel",
   "brave",
+  "tavily",
+  "you",
+  "deepseek",
+  "exa",
 ] as const;
 
 // The current local implementation. This is intentionally separate from the
@@ -272,9 +275,12 @@ export const DEFAULT_CONFIG: UltraSearchConfig = {
   hostedSearch: {
     providers: {
       tinyfish: DEFAULT_HOSTED_SEARCH_PROVIDER,
-      exa: DEFAULT_HOSTED_SEARCH_PROVIDER,
       parallel: DEFAULT_HOSTED_SEARCH_PROVIDER,
       brave: DEFAULT_HOSTED_SEARCH_PROVIDER,
+      tavily: DEFAULT_HOSTED_SEARCH_PROVIDER,
+      you: DEFAULT_HOSTED_SEARCH_PROVIDER,
+      deepseek: DEFAULT_HOSTED_SEARCH_PROVIDER,
+      exa: DEFAULT_HOSTED_SEARCH_PROVIDER,
     },
   },
   remoteFetch: {
@@ -361,9 +367,12 @@ export const CONFIG_SCHEMA = {
   hostedSearch: {
     providers: {
       tinyfish: HOSTED_PROVIDER_SCHEMA,
-      exa: HOSTED_PROVIDER_SCHEMA,
       parallel: HOSTED_PROVIDER_SCHEMA,
       brave: HOSTED_PROVIDER_SCHEMA,
+      tavily: HOSTED_PROVIDER_SCHEMA,
+      you: HOSTED_PROVIDER_SCHEMA,
+      deepseek: HOSTED_PROVIDER_SCHEMA,
+      exa: HOSTED_PROVIDER_SCHEMA,
     },
   },
   remoteFetch: {
